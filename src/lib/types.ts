@@ -37,6 +37,13 @@ export interface Round {
   sitOut?: string[];
 }
 
+/** Round-robin pairing of two players. Session-local for now (not stored). */
+export interface Team {
+  id: string;
+  name: string;
+  playerIds: string[];
+}
+
 export interface BookingPlayer {
   id: string;
   name: string;
