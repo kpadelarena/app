@@ -1,5 +1,16 @@
 import { supabase } from "./supabaseClient";
-import type { Amenities, Booking, BookingCategory, ClubRow, LeagueFormat, Participant, Player, Round } from "./types";
+import type { TablesUpdate } from "./database.types";
+import type {
+  Amenities,
+  Booking,
+  BookingCategory,
+  ClubRow,
+  LeagueFormat,
+  Participant,
+  Player,
+  Role,
+  Round,
+} from "./types";
 
 /* =====================================================================
    Image helpers — resize in the browser before upload so a phone photo
@@ -41,12 +52,12 @@ async function uploadPhoto(bucket: string, path: string, file: File, maxWidth: n
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
-async function updateProfileRow(profileId: string, patch: Record<string, unknown>) {
+async function updateProfileRow(profileId: string, patch: TablesUpdate<"profiles">) {
   const { error } = await supabase.from("profiles").update(patch).eq("id", profileId);
   if (error) throw error;
 }
 
-async function updateClubRow(clubId: string, patch: Record<string, unknown>) {
+async function updateClubRow(clubId: string, patch: TablesUpdate<"clubs">) {
   const { error } = await supabase.from("clubs").update(patch).eq("id", clubId);
   if (error) throw error;
 }
@@ -130,7 +141,7 @@ export interface ClubPatch {
 
 export function updateClub(clubId: string, patch: ClubPatch) {
   // camelCase app fields -> snake_case columns
-  const row: Record<string, unknown> = {};
+  const row: TablesUpdate<"clubs"> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.venue !== undefined) row.venue = patch.venue;
   if (patch.format !== undefined) row.format = patch.format;
@@ -145,14 +156,13 @@ export function updateClub(clubId: string, patch: ClubPatch) {
 export async function getClubPlayers(clubId: string): Promise<Player[]> {
   const { data, error } = await supabase
     .from("club_members")
-    .select("profile_id, guest_name, role, profiles(id, display_name, level, photo_url)")
+    .select("id, profile_id, guest_name, role, profiles(id, display_name, level, photo_url)")
     .eq("club_id", clubId);
   if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped until database types are generated
-  return (data || []).map((row: any) => ({
+  return data.map((row) => ({
     id: row.profile_id || row.id,
     name: row.profiles?.display_name || row.guest_name || "?",
-    role: row.role,
+    role: row.role as Role,
     level: row.profiles?.level,
     photo: row.profiles?.photo_url,
     isGuest: !row.profile_id,
@@ -215,7 +225,7 @@ export async function getRounds(clubId: string): Promise<Round[]> {
   if (error) throw error;
 
   const byRound = new Map<number, Round>();
-  for (const row of data || []) {
+  for (const row of data) {
     let round = byRound.get(row.round_number);
     if (!round) {
       round = { roundNumber: row.round_number, matches: [], sitOut: row.sit_out_ids || [] };
@@ -263,10 +273,10 @@ export async function clearAllMatches(clubId: string) {
 }
 
 export async function updateMatchScore(matchId: string, field: "scoreA" | "scoreB", value: string) {
-  const column = field === "scoreA" ? "score_a" : "score_b";
+  const score = scoreToColumn(value);
   const { error } = await supabase
     .from("matches")
-    .update({ [column]: scoreToColumn(value) })
+    .update(field === "scoreA" ? { score_a: score } : { score_b: score })
     .eq("id", matchId);
   if (error) throw error;
 }
@@ -281,16 +291,14 @@ export async function getBookings(clubId: string): Promise<Booking[]> {
     .eq("club_id", clubId);
   if (error) throw error;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped until database types are generated
-  return (data || []).map((row: any) => ({
+  return data.map((row) => ({
     id: row.id,
     groupId: row.group_id,
     court: row.court_number,
     date: row.booking_date,
-    time: row.booking_time?.slice(0, 5),
-    category: row.category,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    players: (row.booking_participants || []).map((p: any) => ({
+    time: row.booking_time.slice(0, 5),
+    category: row.category as BookingCategory,
+    players: row.booking_participants.map((p) => ({
       id: p.profile_id || p.id,
       name: p.profiles?.display_name || p.guest_name || "게스트",
     })),
