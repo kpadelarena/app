@@ -1,3 +1,10 @@
+/** One bookable hour on one court. */
+export interface Slot {
+  date: string;
+  time: string;
+  court: number;
+}
+
 export function generateTimeSlots(startHour: number, endHour: number, stepMinutes: number) {
   const slots: string[] = [];
   let mins = startHour * 60;
