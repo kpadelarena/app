@@ -51,7 +51,10 @@ import {
 import { uid } from "./lib/uid";
 import { TIME_SLOTS, nextDays } from "./features/booking/slots";
 import { generateAmericanoRounds, generateMexicanoRound, generateRoundRobinRounds } from "./features/league/schedule";
-import { individualStandings, teamStandings } from "./features/league/standings";
+import { MyScheduleTab } from "./features/league/MyScheduleTab";
+import { PlayersTab } from "./features/league/PlayersTab";
+import { ScheduleTab } from "./features/league/ScheduleTab";
+import { StandingsTab } from "./features/league/StandingsTab";
 import { C, FONT } from "./styles/tokens";
 import { Eyebrow } from "./components/ui/Eyebrow";
 import { PrimaryButton } from "./components/ui/PrimaryButton";
@@ -61,152 +64,10 @@ import { Th, Td } from "./components/ui/Table";
 import { PhotoInput } from "./components/ui/PhotoInput";
 import { AuthModal } from "./features/auth/AuthModal";
 import { BookingTab } from "./features/booking/BookingTab";
-import { BOOKING_SLOTS_PER_MATCH, categoryOf } from "./features/booking/constants";
+import { BOOKING_SLOTS_PER_MATCH } from "./features/booking/constants";
 import { VENUES } from "./features/club/constants";
 import { VenueInfo } from "./features/club/VenueInfo";
 
-
-/* ---------------------------------------------------------
-   코트 다이어그램 매치 카드 — 시그니처 요소
---------------------------------------------------------- */
-function CourtMatch({ match, nameOf, onScore, disabled }) {
-  const a = Number(match.scoreA);
-  const b = Number(match.scoreB);
-  const hasScore = match.scoreA !== "" && match.scoreB !== "" && !isNaN(a) && !isNaN(b);
-  const aWins = hasScore && a > b;
-  const bWins = hasScore && b > a;
-
-  return (
-    <div
-      style={{
-        borderRadius: 14,
-        overflow: "hidden",
-        background: C.turf,
-        border: `1px solid ${C.turfLight}`,
-        boxShadow: "0 1px 0 rgba(255,255,255,0.06) inset",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          borderBottom: `1px solid ${C.line}`,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: FONT.display,
-            fontSize: 11,
-            letterSpacing: "0.14em",
-            color: "rgba(255,255,255,0.65)",
-            textTransform: "uppercase",
-          }}
-        >
-          Court {match.court}
-        </span>
-      </div>
-
-      <div style={{ display: "flex", position: "relative" }}>
-        {/* net line */}
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: 0,
-            bottom: 0,
-            width: 0,
-            borderLeft: `2px dashed ${C.line}`,
-          }}
-        />
-        {[match.sideA, match.sideB].map((side, si) => {
-          const isWinner = si === 0 ? aWins : bWins;
-          return (
-            <div
-              key={si}
-              style={{
-                flex: 1,
-                padding: "14px 12px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                background: isWinner ? "rgba(215,241,59,0.08)" : "transparent",
-              }}
-            >
-              {side.map((id) => (
-                <div
-                  key={id}
-                  style={{
-                    fontFamily: FONT.body,
-                    fontWeight: isWinner ? 700 : 500,
-                    fontSize: 14,
-                    color: isWinner ? C.ball : "#EDEFE8",
-                    lineHeight: 1.35,
-                  }}
-                >
-                  {nameOf(id)}
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 10,
-          padding: "10px 12px 14px",
-        }}
-      >
-        <ScoreInput
-          value={match.scoreA}
-          onChange={(v) => onScore("scoreA", v)}
-          highlight={aWins}
-          disabled={disabled}
-        />
-        <span style={{ color: "rgba(255,255,255,0.4)", fontFamily: FONT.mono }}>
-          :
-        </span>
-        <ScoreInput
-          value={match.scoreB}
-          onChange={(v) => onScore("scoreB", v)}
-          highlight={bWins}
-          disabled={disabled}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ScoreInput({ value, onChange, highlight, disabled }) {
-  return (
-    <input
-      type="number"
-      inputMode="numeric"
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder="-"
-      style={{
-        width: 48,
-        height: 40,
-        textAlign: "center",
-        borderRadius: 8,
-        border: `1px solid ${highlight ? C.ball : "rgba(255,255,255,0.25)"}`,
-        background: highlight ? "rgba(215,241,59,0.14)" : "rgba(255,255,255,0.06)",
-        color: highlight ? C.ball : "#fff",
-        fontFamily: FONT.mono,
-        fontWeight: 700,
-        fontSize: 17,
-        outline: "none",
-      }}
-    />
-  );
-}
 
 /* ---------------------------------------------------------
    메인 앱
@@ -217,8 +78,6 @@ export default function PadelLeagueApp() {
   const [saveError, setSaveError] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
   const [tab, setTab] = useState("booking");
-  const [newPlayerName, setNewPlayerName] = useState("");
-  const [numRounds, setNumRounds] = useState(5);
   const [editingName, setEditingName] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState("");
@@ -526,25 +385,6 @@ export default function PadelLeagueApp() {
     [league]
   );
 
-  const nameOf = useCallback(
-    (id) => {
-      if (!league) return id;
-      const p = league.players.find((x) => x.id === id);
-      if (p) return p.name;
-      const t = league.teams.find((x) => x.id === id);
-      if (t) return t.name;
-      return "?";
-    },
-    [league]
-  );
-
-  const standings = useMemo(() => {
-    if (!league) return [];
-    return league.format === "round_robin"
-      ? teamStandings(league.teams, league.rounds)
-      : individualStandings(league.players, league.rounds);
-  }, [league]);
-
   if (loading) {
     return (
       <div
@@ -599,10 +439,7 @@ export default function PadelLeagueApp() {
     );
   }
 
-  const addPlayer = async () => {
-    const name = newPlayerName.trim();
-    if (!name) return;
-    setNewPlayerName("");
+  const addPlayer = async (name) => {
     try {
       const player = await addGuestPlayer(league.id, name);
       setLeague((prev) => ({ ...prev, players: [...prev.players, player] }));
@@ -641,7 +478,7 @@ export default function PadelLeagueApp() {
     setLeague((prev) => ({ ...prev, teams }));
   };
 
-  const generateSchedule = async () => {
+  const generateSchedule = async (numRounds) => {
     try {
       if (league.format === "americano") {
         if (league.players.length < 4) return;
@@ -1016,22 +853,17 @@ export default function PadelLeagueApp() {
         {tab === "players" && (
           <PlayersTab
             league={league}
-            newPlayerName={newPlayerName}
-            setNewPlayerName={setNewPlayerName}
-            addPlayer={addPlayer}
-            removePlayer={removePlayer}
-            autoAssignTeams={autoAssignTeams}
+            onAddPlayer={addPlayer}
+            onRemovePlayer={removePlayer}
+            onAutoAssignTeams={autoAssignTeams}
           />
         )}
 
         {tab === "schedule" && (
           <ScheduleTab
             league={league}
-            numRounds={numRounds}
-            setNumRounds={setNumRounds}
-            generateSchedule={generateSchedule}
-            updateScore={updateScore}
-            nameOf={nameOf}
+            onGenerate={generateSchedule}
+            onUpdateScore={updateScore}
             onGenerateNextMexicanoRound={generateNextMexicanoRound}
             onRemoveLastMexicanoRound={removeLastMexicanoRound}
           />
@@ -1040,7 +872,6 @@ export default function PadelLeagueApp() {
         {tab === "standings" && (
           <StandingsTab
             league={league}
-            standings={standings}
             onUploadResultPhoto={uploadResultPhoto}
             onSetResultPhotoUrl={setResultPhotoUrlHandler}
             resultPhotoUploading={resultPhotoUploading}
@@ -1084,132 +915,6 @@ export default function PadelLeagueApp() {
           onClose={() => setAuthModalOpen(false)}
         />
       )}
-    </div>
-  );
-}
-
-function MyScheduleTab({ league, currentMember, onOpenAuth }) {
-  if (!currentMember) {
-    return (
-      <SectionCard>
-        <Eyebrow>내 일정</Eyebrow>
-        <EmptyHint text="회원가입 또는 로그인을 하면 내가 예약한 코트와 경기 일정을 모아볼 수 있어요." />
-        <div style={{ marginTop: 12 }}>
-          <PrimaryButton onClick={onOpenAuth}>회원가입 · 로그인</PrimaryButton>
-        </div>
-      </SectionCard>
-    );
-  }
-
-  const myBookings = (league.bookings || [])
-    .filter((b) => b.players.some((p) => p.id === currentMember.id || p.name === currentMember.name))
-    .slice()
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-
-  const myMatches = [];
-  league.rounds.forEach((round) => {
-    round.matches.forEach((m) => {
-      const inA = m.sideA.includes(currentMember.id);
-      const inB = m.sideB.includes(currentMember.id);
-      const inTeamA = league.teams.some((t) => t.id === m.sideA[0] && t.playerIds.includes(currentMember.id));
-      const inTeamB = league.teams.some((t) => t.id === m.sideB[0] && t.playerIds.includes(currentMember.id));
-      if (inA || inB || inTeamA || inTeamB) {
-        myMatches.push({ ...m, roundNumber: round.roundNumber, mySide: inA || inTeamA ? "A" : "B" });
-      }
-    });
-  });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <Eyebrow>내 코트 예약</Eyebrow>
-        {myBookings.length === 0 ? (
-          <EmptyHint text="예약한 코트가 없어요. 코트 예약 탭에서 참여해 보세요." />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-            {myBookings.map((b) => (
-              <div
-                key={b.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  background: C.paperDim,
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    {b.date} · {b.time}
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
-                    {b.venue} · 코트 {b.court}
-                  </div>
-                </div>
-                <span
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    background: categoryOf(b.category).color,
-                    color: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  {categoryOf(b.category).label}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-
-      <SectionCard>
-        <Eyebrow>내 경기 일정</Eyebrow>
-        {myMatches.length === 0 ? (
-          <EmptyHint text="예정된 리그 경기가 없어요. 대진표를 생성하면 여기에 표시돼요." />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-            {myMatches.map((m) => {
-              const a = Number(m.scoreA);
-              const b = Number(m.scoreB);
-              const played = m.scoreA !== "" && m.scoreB !== "" && !isNaN(a) && !isNaN(b);
-              const opponents = (m.mySide === "A" ? m.sideB : m.sideA)
-                .map((id) => league.players.find((p) => p.id === id)?.name || league.teams.find((t) => t.id === id)?.name || "?")
-                .join(" & ");
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    background: C.paperDim,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>ROUND {m.roundNumber} · 코트 {m.court}</div>
-                    <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>vs {opponents}</div>
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: FONT.mono,
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: played ? C.turf : "rgba(27,36,34,0.35)",
-                    }}
-                  >
-                    {played ? `${m.scoreA} : ${m.scoreB}` : "예정"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }
@@ -1324,348 +1029,6 @@ function CourtStepper({ value, onChange }) {
       >
         +
       </button>
-    </div>
-  );
-}
-
-function PlayersTab({ league, newPlayerName, setNewPlayerName, addPlayer, removePlayer, autoAssignTeams }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <Eyebrow>선수 등록</Eyebrow>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <input
-            value={newPlayerName}
-            onChange={(e) => setNewPlayerName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addPlayer()}
-            placeholder="이름 입력"
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(0,0,0,0.15)",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          <PrimaryButton onClick={addPlayer} icon={Plus}>
-            추가
-          </PrimaryButton>
-        </div>
-
-        {league.players.length === 0 ? (
-          <EmptyHint text="선수를 4명 이상 등록하면 대진표를 만들 수 있어요." />
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-            {league.players.map((p) => (
-              <div
-                key={p.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 8px 6px 12px",
-                  borderRadius: 999,
-                  background: C.paperDim,
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {p.name}
-                <button
-                  onClick={() => removePlayer(p.id)}
-                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", color: "rgba(27,36,34,0.5)" }}
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ marginTop: 10, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-          총 {league.players.length}명 등록됨
-        </div>
-      </SectionCard>
-
-      {league.format === "round_robin" && (
-        <SectionCard>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Eyebrow>팀 편성</Eyebrow>
-            <PrimaryButton onClick={autoAssignTeams} icon={Shuffle} disabled={league.players.length < 2}>
-              자동 팀 편성
-            </PrimaryButton>
-          </div>
-          {league.teams.length === 0 ? (
-            <EmptyHint text="선수를 등록한 뒤 자동 팀 편성을 눌러 2인 1팀으로 묶어주세요." />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-              {league.teams.map((t, i) => (
-                <div
-                  key={t.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    background: C.paperDim,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: FONT.mono,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "rgba(27,36,34,0.5)",
-                    }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-      )}
-    </div>
-  );
-}
-
-function ScheduleTab({
-  league,
-  numRounds,
-  setNumRounds,
-  generateSchedule,
-  updateScore,
-  nameOf,
-  onGenerateNextMexicanoRound,
-  onRemoveLastMexicanoRound,
-}) {
-  const isMexicano = league.format === "mexicano";
-  const isAmericano = league.format === "americano";
-  const canGenerate = isAmericano || isMexicano ? league.players.length >= 4 : league.teams.length >= 2;
-
-  const formatDescription = isAmericano
-    ? "매 라운드 파트너가 바뀌는 아메리카노 방식이에요."
-    : isMexicano
-    ? "매 라운드 현재 순위 기준으로 짝을 다시 맞추는 멕시카노 방식이에요."
-    : "고정된 팀끼리 한 번씩 맞붙는 라운드로빈 방식이에요.";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <Eyebrow>대진표 생성</Eyebrow>
-            <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)", marginTop: 4 }}>{formatDescription}</div>
-          </div>
-          {isAmericano && (
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              라운드 수
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={numRounds}
-                onChange={(e) => setNumRounds(Number(e.target.value) || 1)}
-                style={{
-                  width: 52,
-                  padding: "6px 8px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(0,0,0,0.15)",
-                  fontFamily: FONT.mono,
-                  textAlign: "center",
-                }}
-              />
-            </label>
-          )}
-        </div>
-
-        <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {isMexicano ? (
-            <>
-              <PrimaryButton
-                onClick={league.rounds.length === 0 ? generateSchedule : onGenerateNextMexicanoRound}
-                icon={RefreshCw}
-                disabled={!canGenerate}
-              >
-                {league.rounds.length === 0 ? "1라운드 생성" : "다음 라운드 생성"}
-              </PrimaryButton>
-              {league.rounds.length > 0 && (
-                <PrimaryButton
-                  onClick={onRemoveLastMexicanoRound}
-                  style={{ background: "transparent", color: C.danger, border: `1px solid ${C.danger}` }}
-                >
-                  마지막 라운드 취소
-                </PrimaryButton>
-              )}
-            </>
-          ) : (
-            <PrimaryButton onClick={generateSchedule} icon={RefreshCw} disabled={!canGenerate}>
-              {league.rounds.length > 0 ? "대진표 다시 생성" : "대진표 생성"}
-            </PrimaryButton>
-          )}
-        </div>
-
-        {isMexicano && league.rounds.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-            다음 라운드는 지금까지 입력된 점수를 기준으로 순위를 다시 계산해 짝을 맞춰요. 이번 라운드 점수를 먼저 입력하세요.
-          </div>
-        )}
-
-        {!canGenerate && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-            {isAmericano || isMexicano
-              ? "선수 · 팀 탭에서 4명 이상 등록해 주세요."
-              : "선수 · 팀 탭에서 팀을 2개 이상 편성해 주세요."}
-          </div>
-        )}
-      </SectionCard>
-
-      {league.rounds.length === 0 ? (
-        <EmptyHint text="아직 생성된 라운드가 없어요." />
-      ) : (
-        league.rounds.map((round, ri) => (
-          <div key={round.roundNumber}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontFamily: FONT.display, fontSize: 20, fontWeight: 700 }}>
-                ROUND {round.roundNumber}
-              </span>
-              {round.sitOut && round.sitOut.length > 0 && (
-                <span style={{ fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-                  대기: {round.sitOut.map((id) => nameOf(id)).join(", ")}
-                </span>
-              )}
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {round.matches.map((m) => (
-                <CourtMatch
-                  key={m.id}
-                  match={m}
-                  nameOf={nameOf}
-                  onScore={(field, value) => updateScore(ri, m.id, field, value)}
-                />
-              ))}
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-function StandingsTab({ league, standings, onUploadResultPhoto, onSetResultPhotoUrl, resultPhotoUploading }) {
-  const isIndividual = league.format === "americano" || league.format === "mexicano";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <Eyebrow>결과 사진</Eyebrow>
-        {league.resultPhoto && (
-          <img
-            src={league.resultPhoto}
-            alt="경기 결과"
-            style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 12, marginTop: 10 }}
-          />
-        )}
-        <div style={{ marginTop: 10 }}>
-          <PhotoInput
-            label={league.resultPhoto ? "사진 교체" : "사진 추가"}
-            uploading={resultPhotoUploading}
-            onFile={onUploadResultPhoto}
-            onSetUrl={onSetResultPhotoUrl}
-          />
-        </div>
-      </SectionCard>
-
-      {standings.length === 0 ? (
-        <EmptyHint text="아직 순위 데이터가 없어요. 대진표에서 경기 결과를 입력해 주세요." />
-      ) : (
-        <SectionCard>
-          <Eyebrow>{league.name} · 순위</Eyebrow>
-          <div style={{ marginTop: 14, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: `2px solid ${C.ink}` }}>
-                  <Th align="left">#</Th>
-                  <Th align="left">{isIndividual ? "선수" : "팀"}</Th>
-                  {isIndividual ? (
-                    <>
-                      <Th>경기</Th>
-                      <Th>승</Th>
-                      <Th>포인트</Th>
-                    </>
-                  ) : (
-                    <>
-                      <Th>경기</Th>
-                      <Th>승</Th>
-                      <Th>패</Th>
-                      <Th>득실차</Th>
-                      <Th>승점</Th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {standings.map((s, i) => (
-                  <tr
-                    key={s.id}
-                    style={{
-                      borderBottom: "1px solid rgba(0,0,0,0.06)",
-                      background: i < 3 ? "rgba(215,241,59,0.15)" : "transparent",
-                    }}
-                  >
-                    <Td>
-                      <span
-                        style={{
-                          fontFamily: FONT.mono,
-                          fontWeight: 700,
-                          color: i === 0 ? C.turf : C.charcoal,
-                        }}
-                      >
-                        {i + 1}
-                      </span>
-                    </Td>
-                    <Td align="left">
-                      <span style={{ fontWeight: 700 }}>{s.name}</span>
-                    </Td>
-                    {isIndividual ? (
-                      <>
-                        <Td>{s.played}</Td>
-                        <Td>{s.wins}</Td>
-                        <Td>
-                          <span style={{ fontFamily: FONT.mono, fontWeight: 700 }}>
-                            {s.points}
-                          </span>
-                        </Td>
-                      </>
-                    ) : (
-                      <>
-                        <Td>{s.played}</Td>
-                        <Td>{s.win}</Td>
-                        <Td>{s.loss}</Td>
-                        <Td>{s.diff > 0 ? `+${s.diff}` : s.diff}</Td>
-                        <Td>
-                      <span style={{ fontFamily: FONT.mono, fontWeight: 700 }}>
-                        {s.pts}
-                      </span>
-                    </Td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
-      )}
     </div>
   );
 }
