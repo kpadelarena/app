@@ -18,7 +18,7 @@ test("a visitor sees the club without logging in", async ({ page }) => {
   await expect(page.getByRole("button", { name: "코트 예약" })).toBeVisible();
 });
 
-test("the owner can add a player and generate a schedule", async ({ page }) => {
+test("the owner can add a player, generate a schedule and enter a score", async ({ page }) => {
   await logInAsOwner(page);
 
   const guest = `E2E ${Date.now()}`;
@@ -28,13 +28,25 @@ test("the owner can add a player and generate a schedule", async ({ page }) => {
   await expect(page.getByText(guest)).toBeVisible();
 
   await page.getByRole("button", { name: "대진표", exact: true }).click();
+  // Generating stores the rounds, then re-reads them; wait for both before typing a score.
+  const matches = (method: string) =>
+    page.waitForResponse((r) => r.request().method() === method && r.url().includes("/rest/v1/matches"));
+  const stored = matches("POST");
   await page.getByRole("button", { name: /대진표 (다시 )?생성/ }).click();
+  await stored;
+  await matches("GET");
   await expect(page.getByText("ROUND 1")).toBeVisible();
 
-  // The schedule is stored, not just in memory.
+  const firstScore = page.getByPlaceholder("-").first();
+  const scoreSaved = matches("PATCH");
+  await firstScore.fill("7");
+  await scoreSaved;
+
+  // The schedule and the score are stored, not just in memory.
   await page.reload();
   await page.getByRole("button", { name: "대진표", exact: true }).click();
   await expect(page.getByText("ROUND 1")).toBeVisible();
+  await expect(firstScore).toHaveValue("7");
 });
 
 test("the owner can book a free court slot", async ({ page }) => {
