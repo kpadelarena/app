@@ -18,14 +18,16 @@ pnpm dev
 http://localhost:3000 에서 확인. 개발용 로그인 계정은
 [`supabase/seed.sql`](./supabase/seed.sql) 맨 위에 적혀 있습니다.
 
-| 명령             | 설명                                                  |
-| ---------------- | ----------------------------------------------------- |
-| `pnpm db:reset`  | 로컬 DB를 비우고 마이그레이션과 시드를 다시 적용      |
-| `pnpm db:types`  | DB 스키마에서 `src/lib/database.types.ts`를 다시 생성 |
-| `pnpm db:stop`   | 로컬 Supabase 중지                                    |
-| `pnpm typecheck` | 타입 검사                                             |
-| `pnpm lint`      | ESLint                                                |
-| `pnpm format`    | Prettier로 코드 정리                                  |
+| 명령             | 설명                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm db:reset`  | 로컬 DB를 비우고 마이그레이션과 시드를 다시 적용                                                                          |
+| `pnpm db:types`  | DB 스키마에서 `src/lib/database.types.ts`를 다시 생성                                                                     |
+| `pnpm db:stop`   | 로컬 Supabase 중지                                                                                                        |
+| `pnpm test`      | 단위 테스트 (Vitest)                                                                                                      |
+| `pnpm test:e2e`  | E2E 스모크 테스트 (Playwright). 로컬 Supabase가 떠 있어야 하며, 처음 한 번은 `pnpm exec playwright install chromium` 필요 |
+| `pnpm typecheck` | 타입 검사                                                                                                                 |
+| `pnpm lint`      | ESLint                                                                                                                    |
+| `pnpm format`    | Prettier로 코드 정리                                                                                                      |
 
 로컬 Supabase Studio(테이블 보기·SQL 실행)는 http://127.0.0.1:54323 입니다.
 
