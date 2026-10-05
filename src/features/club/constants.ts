@@ -2,6 +2,9 @@ import type { LeagueFormat } from "@/lib/types";
 
 export const VENUES = ["Yongsan Mmove", "Gimpo Padel Society", "Dongtan Garros Padel"];
 
+/** Every venue is in Korea; booking dates and hours are in this timezone. */
+export const VENUE_TIME_ZONE = "Asia/Seoul";
+
 export const AMENITIES = [
   { key: "parking", label: "주차" },
   { key: "lockerRoom", label: "탈의실" },
