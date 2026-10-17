@@ -4,6 +4,7 @@ export const queryKeys = {
   session: ["session"] as const,
   venues: ["venues"] as const,
   members: ["members"] as const,
+  contacts: ["contacts"] as const,
   bookings: {
     all: ["bookings"] as const,
     forVenue: (venueId: string, fromIso: string) => ["bookings", venueId, fromIso] as const,

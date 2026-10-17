@@ -1,6 +1,14 @@
-import type { LeagueFormat } from "@/lib/types";
+import type { LeagueFormat, Role } from "@/lib/types";
 
 export const CLUB_NAME = "K-Padel Arena";
+
+export const ROLES: { key: Role; label: string }[] = [
+  { key: "owner", label: "운영자" },
+  { key: "admin", label: "관리자" },
+  { key: "member", label: "회원" },
+];
+
+export const roleLabel = (role: Role) => ROLES.find((r) => r.key === role)?.label ?? role;
 
 export const AMENITIES = [
   { key: "parking", label: "주차" },

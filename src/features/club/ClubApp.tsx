@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarRange, Grid3x3, UserCircle } from "lucide-react";
+import { CalendarRange, Grid3x3, UserCircle, Users } from "lucide-react";
 import { CenteredScreen } from "@/components/ui/CenteredScreen";
 import { TabBar } from "@/components/ui/TabBar";
 import { AccountButton } from "@/features/auth/AccountButton";
@@ -9,6 +9,7 @@ import { AuthModal } from "@/features/auth/AuthModal";
 import { useSession } from "@/features/auth/useSession";
 import { BookingTab } from "@/features/booking/BookingTab";
 import { LeagueTab } from "@/features/league/LeagueTab";
+import { MembersTab } from "@/features/members/MembersTab";
 import { MyScheduleTab } from "@/features/league/MyScheduleTab";
 import { C, FONT } from "@/styles/tokens";
 import { ClubHeader } from "./ClubHeader";
@@ -20,6 +21,7 @@ const TABS = [
   { key: "booking", label: "코트 예약", icon: Grid3x3 },
   { key: "myschedule", label: "내 일정", icon: UserCircle },
   { key: "league", label: "리그", icon: CalendarRange },
+  { key: "members", label: "회원", icon: Users },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -133,6 +135,15 @@ export function ClubApp() {
             venueId={venue.id}
             member={session.member}
             isAdmin={session.isAdmin}
+            onOpenAuth={openAuth}
+          />
+        )}
+
+        {tab === "members" && (
+          <MembersTab
+            member={session.member}
+            isAdmin={session.isAdmin}
+            isOwner={session.member?.role === "owner"}
             onOpenAuth={openAuth}
           />
         )}
