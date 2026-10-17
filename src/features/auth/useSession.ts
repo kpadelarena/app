@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentMember, requestPasswordReset, signIn, signInWithGoogle, signOut, signUp } from "@/lib/auth";
-import { setAvatarUrl, updateProfileLevel, uploadAvatar } from "@/lib/db";
+import { setAvatarUrl, updateContactPhone, updateProfileLevel, uploadAvatar } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabaseClient";
 import type { Member } from "@/lib/types";
@@ -87,11 +87,11 @@ export function useSession() {
     return result.error ? { error: result.error.message } : {};
   }, []);
 
+  /* A full reload after signing out drops every cached view and any open sheet. */
   const logOut = useCallback(async () => {
     await signOut();
-    queryClient.setQueryData<Session>(queryKeys.session, null);
-    invalidateMemberData();
-  }, [queryClient, invalidateMemberData]);
+    window.location.reload();
+  }, []);
 
   /* The current member id straight from the cache, so an action started
      right after sign-up (uploading the chosen photo) sees the new account. */
@@ -135,14 +135,27 @@ export function useSession() {
     [currentMemberId, patchMember],
   );
 
-  const updateLevel = useCallback(
-    (level: number) => {
+  /* Level and phone together, from the profile form's save button. */
+  const saveProfile = useCallback(
+    async (changes: { level: number; phone: string }): Promise<{ error?: string }> => {
       const id = currentMemberId();
-      if (!id) return;
-      patchMember({ level });
-      updateProfileLevel(id, level).catch(() => {});
+      if (!id) return { error: "signed_out" };
+      const phone = changes.phone.trim() || null;
+      try {
+        await Promise.all([updateProfileLevel(id, changes.level), updateContactPhone(id, phone)]);
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : "save_failed" };
+      }
+      queryClient.setQueryData<Session>(queryKeys.session, (prev) =>
+        prev
+          ? { ...prev, member: { ...prev.member, level: changes.level }, contact: { ...prev.contact, phone } }
+          : prev,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.members });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contacts });
+      return {};
     },
-    [currentMemberId, patchMember],
+    [currentMemberId, queryClient],
   );
 
   const isAdmin = member?.role === "owner" || member?.role === "admin";
@@ -160,6 +173,6 @@ export function useSession() {
     logOut,
     updatePhoto,
     updatePhotoUrl,
-    updateLevel,
+    saveProfile,
   };
 }

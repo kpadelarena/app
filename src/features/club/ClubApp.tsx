@@ -47,7 +47,7 @@ export function ClubApp() {
       onSignUp={session.signUp}
       onUploadProfilePhoto={session.updatePhoto}
       onSetProfilePhotoUrl={session.updatePhotoUrl}
-      onUpdateLevel={session.updateLevel}
+      onSaveProfile={session.saveProfile}
       profileUploading={session.profileUploading}
       onClose={() => setAuthModalOpen(false)}
     />

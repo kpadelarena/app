@@ -31,7 +31,7 @@ interface AuthModalProps {
   onSignUp: (form: SignUpForm) => Promise<AuthOutcome>;
   onUploadProfilePhoto: (file: File) => void | Promise<void>;
   onSetProfilePhotoUrl: (url: string) => void;
-  onUpdateLevel: (level: number) => void;
+  onSaveProfile: (changes: { level: number; phone: string }) => Promise<{ error?: string }>;
   profileUploading: boolean;
   onClose: () => void;
 }
@@ -131,7 +131,7 @@ export function AuthModal({
   onSignUp,
   onUploadProfilePhoto,
   onSetProfilePhotoUrl,
-  onUpdateLevel,
+  onSaveProfile,
   profileUploading,
   onClose,
 }: AuthModalProps) {
@@ -151,6 +151,23 @@ export function AuthModal({
   const [loginError, setLoginError] = useState("");
   const [loginNotice, setLoginNotice] = useState("");
   const [resetSent, setResetSent] = useState(false);
+
+  // The profile form edits a draft; nothing is written until 저장.
+  const [draftLevel, setDraftLevel] = useState(member?.level ?? 3.0);
+  const [draftPhone, setDraftPhone] = useState(contact?.phone ?? "");
+  const [profileNotice, setProfileNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const profileChanged = !!member && (draftLevel !== member.level || draftPhone.trim() !== (contact?.phone ?? ""));
+
+  const saveProfile = async () => {
+    setBusy(true);
+    const result = await onSaveProfile({ level: draftLevel, phone: draftPhone });
+    setBusy(false);
+    setProfileNotice(
+      result.error
+        ? { text: "저장에 실패했어요. 잠시 후 다시 시도해 주세요.", error: true }
+        : { text: "저장했어요.", error: false },
+    );
+  };
 
   const submitReset = async () => {
     setLoginError("");
@@ -198,6 +215,8 @@ export function AuthModal({
       return;
     }
     if (signupPhotoFile) await onUploadProfilePhoto(signupPhotoFile);
+    setDraftLevel(level);
+    setDraftPhone(phone.trim());
     setMode("profile");
   };
 
@@ -252,13 +271,15 @@ export function AuthModal({
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar photo={member.photo} alt={member.name} size={64} />
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 700 }}>{member.name}</div>
-              <div style={{ fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-                Lv.{member.level.toFixed(1)}
-                {contact?.email ? ` · ${contact.email}` : ""}
-                {contact?.phone ? ` · ${contact.phone}` : ""}
-              </div>
+              <div style={{ fontSize: 12, color: "rgba(27,36,34,0.5)" }}>Lv.{member.level.toFixed(1)}</div>
+              {contact?.email && (
+                <div style={{ fontSize: 12, color: "rgba(27,36,34,0.5)", overflowWrap: "anywhere" }}>
+                  {contact.email}
+                  <span style={{ marginLeft: 6, fontSize: 11 }}>· 나와 관리자에게만 보여요</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -269,9 +290,29 @@ export function AuthModal({
             onSetUrl={onSetProfilePhotoUrl}
           />
 
-          <LevelSlider value={member.level} onChange={onUpdateLevel} />
+          <LevelSlider value={draftLevel} onChange={setDraftLevel} />
 
-          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "rgba(27,36,34,0.6)" }}
+          >
+            연락처 · 관리자에게만 보여요
+            <input
+              type="tel"
+              value={draftPhone}
+              onChange={(e) => setDraftPhone(e.target.value)}
+              placeholder="010-0000-0000"
+              style={fieldStyle}
+            />
+          </label>
+
+          {profileNotice && (
+            <div style={{ fontSize: 12, color: profileNotice.error ? C.danger : C.turf }}>{profileNotice.text}</div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 4, justifyContent: "space-between" }}>
+            <PrimaryButton onClick={saveProfile} disabled={busy || !profileChanged}>
+              {busy ? "저장 중..." : "저장"}
+            </PrimaryButton>
             <PrimaryButton onClick={onLogout} icon={LogOut} style={{ background: C.danger, color: "#fff" }}>
               로그아웃
             </PrimaryButton>

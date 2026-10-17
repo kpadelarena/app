@@ -91,6 +91,12 @@ export const setAvatarUrl = (profileId: string, url: string) => updateProfile(pr
 
 export const updateProfileLevel = (profileId: string, level: number) => updateProfile(profileId, { level });
 
+/* Only the person (or an admin) may change it; phone is the only writable column. */
+export async function updateContactPhone(profileId: string, phone: string | null) {
+  const { error } = await supabase.from("profile_contacts").update({ phone }).eq("id", profileId);
+  if (error) throw error;
+}
+
 /* Owners only; the database also keeps the last owner in place. */
 export const updateMemberRole = (profileId: string, role: Role) => updateProfile(profileId, { role });
 
