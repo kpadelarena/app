@@ -12,6 +12,19 @@ export type Amenities = Record<string, boolean>;
 export type ClubRow = Tables<"clubs">;
 export type ProfileRow = Tables<"profiles">;
 
+/** The signed-in user's profile, as the UI uses it. */
+export interface Member {
+  id: string;
+  name: string;
+  username: string;
+  level: number;
+  photo: string | null;
+  region: string | null;
+  email: string | null;
+  phone: string | null;
+  gender: string | null;
+}
+
 export interface Player {
   id: string;
   name: string;
