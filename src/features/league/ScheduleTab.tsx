@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { EmptyHint } from "@/components/ui/EmptyHint";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -43,8 +44,13 @@ export function ScheduleTab({
   const isIndividual = isAmericano || isMexicano;
   const hasRounds = league.rounds.length > 0;
   const canGenerate = isIndividual ? league.players.length >= 4 : league.teams.length >= 2;
-  const generate = () => {
-    if (hasRounds && !confirm("대진표를 다시 만들면 입력한 점수가 사라져요. 계속할까요?")) return;
+  const confirmDialog = useConfirm();
+  const generate = async () => {
+    if (
+      hasRounds &&
+      !(await confirmDialog("대진표를 다시 만들면 입력한 점수가 사라져요. 계속할까요?", { confirmLabel: "다시 생성" }))
+    )
+      return;
     onGenerate(numRounds);
   };
 
@@ -101,7 +107,16 @@ export function ScheduleTab({
                 </PrimaryButton>
                 {hasRounds && (
                   <PrimaryButton
-                    onClick={onRemoveLastMexicanoRound}
+                    onClick={async () => {
+                      const ok = await confirmDialog(
+                        "마지막 라운드를 취소할까요? 그 라운드에 입력한 점수는 사라져요.",
+                        {
+                          confirmLabel: "라운드 취소",
+                          danger: true,
+                        },
+                      );
+                      if (ok) onRemoveLastMexicanoRound();
+                    }}
                     style={{ background: "transparent", color: C.danger, border: `1px solid ${C.danger}` }}
                   >
                     마지막 라운드 취소

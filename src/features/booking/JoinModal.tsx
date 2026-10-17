@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link2, Trash2, UserPlus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { chipStyle } from "@/components/ui/chipStyle";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
@@ -85,6 +86,7 @@ function AdminControls({
   onUpdate: (patch: BookingPatch) => void;
   onDelete: () => void;
 }) {
+  const confirmDialog = useConfirm();
   const date = zonedDate(new Date(booking.startsAt), venue.timezone);
   const currentStart = zonedTime(new Date(booking.startsAt), venue.timezone);
   const currentHours = Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3_600_000);
@@ -161,7 +163,15 @@ function AdminControls({
 
       <div>
         <button
-          onClick={() => window.confirm("이 예약을 삭제할까요? 참여자 모두에게서 사라져요.") && onDelete()}
+          onClick={async () => {
+            if (
+              await confirmDialog("이 예약을 삭제할까요? 참여자 모두에게서 사라져요.", {
+                confirmLabel: "삭제",
+                danger: true,
+              })
+            )
+              onDelete();
+          }}
           style={{
             background: "none",
             border: `1px solid ${C.danger}`,
@@ -196,6 +206,7 @@ export function JoinModal({
   onOpenAuth,
   onClose,
 }: JoinModalProps) {
+  const confirmDialog = useConfirm();
   const [hours, setHours] = useState(1);
   const [kind, setKind] = useState<BookingKind>("match");
   const [visibility, setVisibility] = useState<Visibility>("public");
@@ -343,7 +354,16 @@ export function JoinModal({
                   </span>
                   {p && canRemove(p) && (
                     <button
-                      onClick={() => onLeave(p.id)}
+                      onClick={async () => {
+                        const self = p.profileId === member.id;
+                        const ok = await confirmDialog(
+                          self
+                            ? "이 예약 참여를 취소할까요? 마지막 참여자가 나가면 예약도 삭제돼요."
+                            : `${p.name}님을 이 예약에서 내보낼까요?`,
+                          { confirmLabel: self ? "참여 취소" : "내보내기", danger: true },
+                        );
+                        if (ok) onLeave(p.id);
+                      }}
                       title={p.profileId === member.id ? "참여 취소" : "내보내기"}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(27,36,34,0.4)" }}
                     >

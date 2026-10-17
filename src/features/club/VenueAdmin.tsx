@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -101,6 +102,7 @@ interface VenueAdminProps {
    courts yet, which is where a freshly created one lands. */
 export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCourt }: VenueAdminProps) {
   const [open, setOpen] = useState(venue.courts.length === 0);
+  const confirmDialog = useConfirm();
   const [name, setName] = useState(venue.name);
   const [address, setAddress] = useState(venue.address ?? "");
   const [courtName, setCourtName] = useState("");
@@ -113,12 +115,18 @@ export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCour
     setCourtName("");
     onAddCourt(next);
   };
-  const removeCourt = (courtId: string, courtLabel: string) => {
-    if (confirm(`코트 ${courtLabel}을(를) 숨길까요? 이미 잡힌 예약은 그대로 남아요.`)) onRemoveCourt(courtId);
+  const removeCourt = async (courtId: string, courtLabel: string) => {
+    const ok = await confirmDialog(`코트 ${courtLabel}을(를) 숨길까요? 이미 잡힌 예약은 그대로 남아요.`, {
+      confirmLabel: "숨기기",
+    });
+    if (ok) onRemoveCourt(courtId);
   };
-  const remove = () => {
-    if (confirm(`${venue.name} 지점을 삭제할까요? 코트와 예약이 함께 삭제돼요. 리그 이벤트가 있으면 삭제할 수 없어요.`))
-      onDelete();
+  const remove = async () => {
+    const ok = await confirmDialog(
+      `${venue.name} 지점을 삭제할까요? 코트와 예약이 함께 삭제돼요. 리그 이벤트가 있으면 삭제할 수 없어요.`,
+      { confirmLabel: "삭제", danger: true },
+    );
+    if (ok) onDelete();
   };
 
   return (

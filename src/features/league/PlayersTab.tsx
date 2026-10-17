@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, Shuffle, X } from "lucide-react";
 import { EmptyHint } from "@/components/ui/EmptyHint";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -48,8 +49,13 @@ export function PlayersTab({
     setGuestName("");
     onAddGuest(name);
   };
-  const assignTeams = () => {
-    if (league.teams.length > 0 && !confirm("팀을 다시 편성하면 대진표가 초기화돼요. 계속할까요?")) return;
+  const confirmDialog = useConfirm();
+  const assignTeams = async () => {
+    if (
+      league.teams.length > 0 &&
+      !(await confirmDialog("팀을 다시 편성하면 대진표가 초기화돼요. 계속할까요?", { confirmLabel: "다시 편성" }))
+    )
+      return;
     onAutoAssignTeams();
   };
 
@@ -109,7 +115,16 @@ export function PlayersTab({
                 {p.isGuest && <span style={{ fontSize: 10, fontWeight: 700, color: dim }}>게스트</span>}
                 {canEdit && (
                   <button
-                    onClick={() => onRemovePlayer(p.id)}
+                    onClick={async () => {
+                      const ok = await confirmDialog(
+                        `${p.name}님을 이 이벤트에서 제외할까요? 이미 만든 대진표에서는 빈 자리로 남아요.`,
+                        {
+                          confirmLabel: "제외",
+                          danger: true,
+                        },
+                      );
+                      if (ok) onRemovePlayer(p.id);
+                    }}
                     aria-label={`${p.name} 제외`}
                     style={{ background: "none", border: "none", cursor: "pointer", display: "flex", color: dim }}
                   >
