@@ -2,6 +2,12 @@ import type { LeagueFormat, Role } from "@/lib/types";
 
 export const CLUB_NAME = "K-Padel Arena";
 
+/** Where members reach the operator (privacy requests, account deletion). */
+export const CONTACT_EMAIL = "kpadelarena@gmail.com";
+
+/** Effective date of the terms and privacy policy. */
+export const POLICY_DATE = "2026년 10월 17일";
+
 export const ROLES: { key: Role; label: string }[] = [
   { key: "owner", label: "운영자" },
   { key: "admin", label: "관리자" },
