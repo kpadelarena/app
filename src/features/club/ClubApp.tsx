@@ -62,7 +62,7 @@ export function ClubApp() {
             관리자가 지점과 코트를 등록하면 여기에 표시돼요.
           </div>
         )}
-        <AccountButton member={session.member} onClick={openAuth} />
+        <AccountButton member={session.member} onClick={openAuth} dark={false} />
         {authModal}
       </CenteredScreen>
     );
