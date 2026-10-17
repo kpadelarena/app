@@ -1,7 +1,5 @@
-"use client";
-
-import PadelLeagueApp from "@/PadelLeagueApp";
+import { ClubApp } from "@/features/club/ClubApp";
 
 export default function Page() {
-  return <PadelLeagueApp />;
+  return <ClubApp />;
 }

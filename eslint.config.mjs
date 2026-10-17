@@ -4,13 +4,7 @@ const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
 
 const eslintConfig = [
   {
-    ignores: [
-      ".next/**",
-      "next-env.d.ts",
-      "src/lib/database.types.ts",
-      // Not linted until it has been split into typed components.
-      "src/PadelLeagueApp.jsx",
-    ],
+    ignores: [".next/**", "next-env.d.ts", "src/lib/database.types.ts"],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript", "prettier"),
   {

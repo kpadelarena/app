@@ -100,6 +100,22 @@ export async function uploadCourtPhoto(clubId: string, courtNumber: number, file
 /* =====================================================================
    Club: load-or-create "my" club, and field updates.
    ===================================================================== */
+export async function getClub(clubId: string): Promise<ClubRow | null> {
+  const { data } = await supabase.from("clubs").select("*").eq("id", clubId).maybeSingle();
+  return data;
+}
+
+/* The club shown to logged-out visitors: the oldest one. */
+export async function getFirstClub(): Promise<ClubRow | null> {
+  const { data } = await supabase
+    .from("clubs")
+    .select("*")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
 export async function getMyClub(profileId: string): Promise<ClubRow | null> {
   const { data: membership, error: memErr } = await supabase
     .from("club_members")
@@ -110,9 +126,7 @@ export async function getMyClub(profileId: string): Promise<ClubRow | null> {
   if (memErr) throw memErr;
   if (!membership) return null;
 
-  const { data: club, error } = await supabase.from("clubs").select("*").eq("id", membership.club_id).single();
-  if (error) throw error;
-  return club;
+  return getClub(membership.club_id);
 }
 
 export async function createClub(profileId: string, { venue }: { venue: string }): Promise<ClubRow> {
