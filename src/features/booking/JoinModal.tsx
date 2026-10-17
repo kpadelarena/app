@@ -7,18 +7,20 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { getMembers, type BookingPatch, type Who } from "@/lib/db";
+import { buildPath, HOME_ROUTE } from "@/features/club/routes";
 import { queryKeys } from "@/lib/queryKeys";
 import type { Booking, BookingKind, Member, Participant, Venue, Visibility } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { CHANGE_CUTOFF_HOURS, KINDS, changesOpen, kindOf } from "./constants";
 import { addHours, hoursBetween, toInstant, zonedDate, zonedTime, type Slot } from "./slots";
 
-/* Copies the page URL, which names this booking, for sharing. */
-function CopyLinkButton() {
+/* Copies the booking's own page (venue, day, booking), which works for
+   anyone, whichever screen the sheet was opened from. */
+function CopyLinkButton({ href }: { href: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(`${window.location.origin}${href}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -245,7 +247,11 @@ export function JoinModal({
       }
       onClose={onClose}
     >
-      {booking && <CopyLinkButton />}
+      {booking && (
+        <CopyLinkButton
+          href={buildPath({ ...HOME_ROUTE, venueId: venue.id, tab: "booking", date: slot.date, bookingId: booking.id })}
+        />
+      )}
       {!member && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 13, color: "rgba(27,36,34,0.6)" }}>
