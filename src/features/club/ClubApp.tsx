@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CalendarRange, Grid3x3, UserCircle } from "lucide-react";
 import { CenteredScreen } from "@/components/ui/CenteredScreen";
 import { TabBar } from "@/components/ui/TabBar";
@@ -10,7 +10,6 @@ import { useSession } from "@/features/auth/useSession";
 import { BookingTab } from "@/features/booking/BookingTab";
 import { LeaguePlaceholder } from "@/features/league/LeaguePlaceholder";
 import { MyScheduleTab } from "@/features/league/MyScheduleTab";
-import { supabase } from "@/lib/supabaseClient";
 import { C, FONT } from "@/styles/tokens";
 import { ClubHeader } from "./ClubHeader";
 import { useVenues } from "./useVenues";
@@ -33,16 +32,6 @@ export function ClubApp() {
   const [tab, setTab] = useState<TabKey>("booking");
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // Read the session on mount, and again whenever someone signs in or out.
-  const { refresh } = session;
-  useEffect(() => {
-    void refresh();
-    const { data } = supabase.auth.onAuthStateChange(() => {
-      void refresh();
-    });
-    return () => data.subscription.unsubscribe();
-  }, [refresh]);
-
   const openAuth = () => setAuthModalOpen(true);
   const authModal = authModalOpen && (
     <AuthModal
@@ -60,7 +49,7 @@ export function ClubApp() {
   );
 
   const { venue } = club;
-  if (club.loading) return <CenteredScreen>불러오는 중...</CenteredScreen>;
+  if (club.loading || session.isLoading) return <CenteredScreen>불러오는 중...</CenteredScreen>;
   if (!venue) {
     return (
       <CenteredScreen>
