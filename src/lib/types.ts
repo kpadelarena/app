@@ -1,36 +1,87 @@
-import type { Tables } from "./database.types";
+import type { Enums, Tables } from "./database.types";
+
+export type Role = Enums<"member_role">;
+export type BookingKind = Enums<"booking_kind">;
+export type Visibility = Enums<"visibility">;
+export type LeagueFormat = Enums<"league_format">;
+export type Amenities = Record<string, boolean>;
+
+export type ProfileRow = Tables<"profiles">;
 
 /* App-side shapes (camelCase), as produced by lib/db.ts from database rows. */
 
-export type Role = "owner" | "admin" | "player";
-export type LeagueFormat = "americano" | "mexicano" | "round_robin";
-export type BookingCategory = "rental" | "match" | "league" | "lesson";
-export type Amenities = Record<string, boolean>;
-
-/** Rows as stored (snake_case). Columns with a CHECK constraint, such as
- *  `clubs.format`, are plain strings here; narrow them where they are read. */
-export type ClubRow = Tables<"clubs">;
-export type ProfileRow = Tables<"profiles">;
-
-/** The signed-in user's profile, as the UI uses it. */
+/** A member as every other member sees them: the public part of a profile. */
 export interface Member {
   id: string;
   name: string;
-  username: string;
   level: number;
   photo: string | null;
-  region: string | null;
+  role: Role;
+}
+
+/** The signed-in member's own contact details (profile_contacts). */
+export interface Contact {
   email: string | null;
   phone: string | null;
-  gender: string | null;
 }
+
+export interface Court {
+  id: string;
+  name: string;
+}
+
+export interface Venue {
+  id: string;
+  name: string;
+  address: string | null;
+  timezone: string;
+  /** Wall-clock "HH:MM" at the venue. */
+  openTime: string;
+  closeTime: string;
+  /** Per booking. */
+  maxPlayers: number;
+  amenities: Amenities;
+  photo: string | null;
+  /** Active courts, in display order. */
+  courts: Court[];
+}
+
+export interface Participant {
+  id: string;
+  profileId: string | null;
+  name: string;
+  isGuest: boolean;
+  addedBy: string | null;
+}
+
+export interface Booking {
+  id: string;
+  courtId: string;
+  /** ISO instants. */
+  startsAt: string;
+  endsAt: string;
+  kind: BookingKind;
+  visibility: Visibility;
+  /** Empty for logged-out visitors, who may not see who is playing. */
+  participants: Participant[];
+}
+
+/** One of the signed-in member's own bookings, with where it is. */
+export interface MyBooking {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  kind: BookingKind;
+  courtName: string;
+  venueName: string;
+}
+
+/* League events — the in-memory shape the league screens render. Wired
+   to the database in a later PR. */
 
 export interface Player {
   id: string;
   name: string;
-  role?: Role;
-  level?: number | null;
-  photo?: string | null;
   isGuest?: boolean;
 }
 
@@ -50,48 +101,21 @@ export interface Round {
   sitOut?: string[];
 }
 
-/** Round-robin pairing of two players. Session-local for now (not stored). */
+/** Round-robin pairing of two players. */
 export interface Team {
   id: string;
   name: string;
   playerIds: string[];
 }
 
-export interface BookingPlayer {
-  id: string;
-  name: string;
-}
-
-export interface Booking {
-  id: string;
-  groupId: string;
-  court: number;
-  date: string;
-  time: string;
-  category: BookingCategory;
-  players: BookingPlayer[];
-}
-
-/** Who is being added to a booking: a signed-in member, or a guest by name. */
-export interface Participant {
-  profileId?: string | null;
-  name: string;
-}
-
-/** Everything the UI shows for the club: its settings plus the loaded
- *  players, schedule and bookings. */
 export interface League {
   id: string;
   name: string;
-  venue: string;
   format: LeagueFormat;
+  eventDate: string;
   courtCount: number;
-  amenities: Amenities;
-  photo: string | null;
   resultPhoto: string | null;
   players: Player[];
   teams: Team[];
   rounds: Round[];
-  bookings: Booking[];
-  createdAt: string;
 }

@@ -1,20 +1,14 @@
 import { Fragment, useMemo, useState } from "react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { SectionCard } from "@/components/ui/SectionCard";
-import type { Booking, BookingCategory, Participant, Player } from "@/lib/types";
+import type { NewBooking, Who } from "@/lib/db";
+import type { Booking, Member, Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
-import { BOOKING_SLOTS_PER_MATCH, CATEGORIES, categoryOf } from "./constants";
+import { DAYS_AHEAD, KINDS, kindOf } from "./constants";
 import { JoinModal } from "./JoinModal";
-import { TIME_SLOTS, nextDays, type Slot } from "./slots";
+import { addHours, hoursBetween, nextDays, toInstant, type Slot } from "./slots";
 
-export interface JoinRequest extends Slot {
-  category: BookingCategory;
-  /** Hours to book; only used when the slot has no booking yet. */
-  duration: number;
-  existing?: Booking;
-}
-
-function CourtHeaderCell({ court }: { court: number }) {
+function CourtHeaderCell({ name }: { name: string }) {
   return (
     <div
       style={{
@@ -27,7 +21,7 @@ function CourtHeaderCell({ court }: { court: number }) {
         padding: "4px 0",
       }}
     >
-      코트 {court}
+      코트 {name}
     </div>
   );
 }
@@ -50,15 +44,22 @@ function LegendDot({ color, border, label }: { color: string; border: string; la
   );
 }
 
-function BookingCell({ booking, onClick }: { booking?: Booking; onClick: () => void }) {
-  const count = booking ? booking.players.length : 0;
-  const full = count >= BOOKING_SLOTS_PER_MATCH;
-  const empty = count === 0;
-  const cat = booking ? categoryOf(booking.category) : null;
+interface BookingCellProps {
+  booking?: Booking;
+  maxPlayers: number;
+  /** Logged-out visitors see that a slot is taken, but not how many are playing. */
+  showCount: boolean;
+  onClick: () => void;
+}
+
+function BookingCell({ booking, maxPlayers, showCount, onClick }: BookingCellProps) {
+  const count = booking ? booking.participants.length : 0;
+  const full = count >= maxPlayers;
+  const empty = !booking;
+  const kind = booking ? kindOf(booking.kind) : null;
 
   const bg = empty ? "#fff" : full ? "#3E6FD9" : "#D6E6FB";
   const border = empty ? "rgba(0,0,0,0.15)" : full ? "#3E6FD9" : "#7FA6E0";
-  const textColor = full ? "#fff" : C.charcoal;
 
   return (
     <button
@@ -68,7 +69,7 @@ function BookingCell({ booking, onClick }: { booking?: Booking; onClick: () => v
         borderRadius: 10,
         border: `1px solid ${border}`,
         background: bg,
-        color: textColor,
+        color: full ? "#fff" : C.charcoal,
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
@@ -79,17 +80,18 @@ function BookingCell({ booking, onClick }: { booking?: Booking; onClick: () => v
       }}
     >
       <span style={{ fontSize: 11, fontWeight: 700 }}>
-        {empty ? "예약 가능" : full ? "마감" : `${BOOKING_SLOTS_PER_MATCH - count}자리 남음`}
+        {empty ? "예약 가능" : !showCount ? "예약됨" : full ? "마감" : `${maxPlayers - count}자리 남음`}
       </span>
-      {!empty && (
+      {booking && showCount && (
         <span style={{ fontSize: 10, opacity: 0.85, fontFamily: FONT.mono }}>
-          {count}/{BOOKING_SLOTS_PER_MATCH}
+          {count}/{maxPlayers}
         </span>
       )}
-      {cat && (
+      {kind && (
         <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 700 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: cat.color, display: "inline-block" }} />
-          {cat.label}
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: kind.color, display: "inline-block" }} />
+          {kind.label}
+          {booking?.visibility === "private" ? " · 비공개" : ""}
         </span>
       )}
     </button>
@@ -105,36 +107,51 @@ const legendRowStyle = {
 } as const;
 
 interface BookingTabProps {
+  venue: Venue;
   bookings: Booking[];
-  players: Player[];
-  courtCount: number;
-  onJoinSlot: (request: JoinRequest, participant: Participant) => void;
-  onRemoveParticipant: (booking: Booking, participantId: string) => void;
+  member: Member | null;
+  isAdmin: boolean;
+  onCreate: (booking: NewBooking) => void;
+  onJoin: (bookingId: string, who: Who) => void;
+  onLeave: (participantId: string) => void;
+  onOpenAuth: () => void;
 }
 
-/* The date picker and the court × hour booking grid. */
-export function BookingTab({ bookings, players, courtCount, onJoinSlot, onRemoveParticipant }: BookingTabProps) {
-  const days = useMemo(() => nextDays(7), []);
+/* The date picker and the court × hour booking grid for one venue. */
+export function BookingTab({
+  venue,
+  bookings,
+  member,
+  isAdmin,
+  onCreate,
+  onJoin,
+  onLeave,
+  onOpenAuth,
+}: BookingTabProps) {
+  const days = useMemo(() => nextDays(DAYS_AHEAD, venue.timezone), [venue.timezone]);
+  const hours = useMemo(() => hoursBetween(venue.openTime, venue.closeTime), [venue.openTime, venue.closeTime]);
   const [selectedDate, setSelectedDate] = useState(days[0].iso);
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
+  const date = days.some((d) => d.iso === selectedDate) ? selectedDate : days[0].iso;
 
-  const findBooking = ({ date, time, court }: Slot) =>
-    bookings.find((b) => b.date === date && b.time === time && b.court === court);
-
-  /* How many consecutive hours (up to 3) can be booked starting at `slot`. */
-  const availableDurations = (slot: Slot) => {
-    const startIdx = TIME_SLOTS.indexOf(slot.time);
-    const out: number[] = [];
-    for (let hours = 1; hours <= 3; hours++) {
-      const lastHour = TIME_SLOTS[startIdx + hours - 1];
-      if (!lastHour || findBooking({ ...slot, time: lastHour })) break;
-      out.push(hours);
+  const slotStart = (slot: Slot) => toInstant(slot.date, slot.time, venue.timezone);
+  const bookingAt = (slot: Slot) => {
+    const at = slotStart(slot).getTime();
+    return bookings.find(
+      (b) => b.courtId === slot.courtId && Date.parse(b.startsAt) <= at && at < Date.parse(b.endsAt),
+    );
+  };
+  /* Free consecutive hours from the slot until closing time or the next booking. */
+  const freeHoursFrom = (slot: Slot) => {
+    let n = 0;
+    for (let i = hours.indexOf(slot.time); i >= 0 && i < hours.length; i++) {
+      if (bookingAt({ ...slot, time: hours[i] })) break;
+      n++;
     }
-    return out.length ? out : [1];
+    return n;
   };
 
-  const courts = Array.from({ length: courtCount }, (_, i) => i + 1);
-  const activeBooking = activeSlot ? findBooking(activeSlot) : undefined;
+  const activeBooking = activeSlot ? bookingAt(activeSlot) : undefined;
 
   return (
     <>
@@ -153,9 +170,9 @@ export function BookingTab({ bookings, players, courtCount, onJoinSlot, onRemove
                 gap: 2,
                 padding: "8px 14px",
                 borderRadius: 12,
-                border: `1px solid ${selectedDate === d.iso ? C.turf : "rgba(0,0,0,0.12)"}`,
-                background: selectedDate === d.iso ? C.turf : "#fff",
-                color: selectedDate === d.iso ? "#fff" : C.charcoal,
+                border: `1px solid ${date === d.iso ? C.turf : "rgba(0,0,0,0.12)"}`,
+                background: date === d.iso ? C.turf : "#fff",
+                color: date === d.iso ? "#fff" : C.charcoal,
                 cursor: "pointer",
               }}
             >
@@ -171,61 +188,84 @@ export function BookingTab({ bookings, players, courtCount, onJoinSlot, onRemove
           <LegendDot color="#3E6FD9" border="#3E6FD9" label="마감" />
         </div>
         <div style={{ ...legendRowStyle, marginTop: 8 }}>
-          {CATEGORIES.map((c) => (
-            <LegendDot key={c.key} color={c.color} border={c.color} label={c.label} />
+          {KINDS.map((k) => (
+            <LegendDot key={k.key} color={k.color} border={k.color} label={k.label} />
           ))}
         </div>
       </SectionCard>
 
       <SectionCard>
-        <div style={{ overflowX: "auto" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `64px repeat(${courts.length}, minmax(96px, 1fr))`,
-              gap: 6,
-              minWidth: 64 + courts.length * 96,
-            }}
-          >
-            <div />
-            {courts.map((c) => (
-              <CourtHeaderCell key={c} court={c} />
-            ))}
+        {venue.courts.length === 0 ? (
+          <div style={{ fontSize: 13, color: "rgba(27,36,34,0.55)" }}>이 지점에는 아직 등록된 코트가 없어요.</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `64px repeat(${venue.courts.length}, minmax(96px, 1fr))`,
+                gap: 6,
+                minWidth: 64 + venue.courts.length * 96,
+              }}
+            >
+              <div />
+              {venue.courts.map((c) => (
+                <CourtHeaderCell key={c.id} name={c.name} />
+              ))}
 
-            {TIME_SLOTS.map((time) => (
-              <Fragment key={time}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    fontFamily: FONT.mono,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "rgba(27,36,34,0.6)",
-                  }}
-                >
-                  {time}
-                </div>
-                {courts.map((court) => {
-                  const slot = { date: selectedDate, time, court };
-                  return <BookingCell key={court} booking={findBooking(slot)} onClick={() => setActiveSlot(slot)} />;
-                })}
-              </Fragment>
-            ))}
+              {hours.map((time) => (
+                <Fragment key={time}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      fontFamily: FONT.mono,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "rgba(27,36,34,0.6)",
+                    }}
+                  >
+                    {time}
+                  </div>
+                  {venue.courts.map((court) => {
+                    const slot = { date, time, courtId: court.id };
+                    return (
+                      <BookingCell
+                        key={court.id}
+                        booking={bookingAt(slot)}
+                        maxPlayers={venue.maxPlayers}
+                        showCount={!!member}
+                        onClick={() => setActiveSlot(slot)}
+                      />
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </SectionCard>
 
       {activeSlot && (
         <JoinModal
+          venue={venue}
           slot={activeSlot}
           booking={activeBooking}
-          players={players}
-          availableDurations={availableDurations(activeSlot)}
-          onJoin={(category, duration, participant) =>
-            onJoinSlot({ ...activeSlot, category, duration, existing: activeBooking }, participant)
-          }
-          onRemove={(participantId) => activeBooking && onRemoveParticipant(activeBooking, participantId)}
+          member={member}
+          isAdmin={isAdmin}
+          freeHours={freeHoursFrom(activeSlot)}
+          onCreate={(hoursToBook, kind, visibility) => {
+            const startsAt = slotStart(activeSlot);
+            onCreate({
+              courtId: activeSlot.courtId,
+              startsAt,
+              endsAt: addHours(startsAt, hoursToBook),
+              kind,
+              visibility,
+            });
+          }}
+          onJoin={(who) => activeBooking && onJoin(activeBooking.id, who)}
+          onLeave={onLeave}
+          onOpenAuth={onOpenAuth}
           onClose={() => setActiveSlot(null)}
         />
       )}

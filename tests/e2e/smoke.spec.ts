@@ -1,64 +1,37 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// The dev login seeded by supabase/seed.sql.
-const OWNER = { username: "owner", password: "padel-dev", name: "관리자" };
+// The dev logins seeded by supabase/seed.sql.
+const OWNER = { email: "owner@example.com", password: "padel-dev", name: "관리자" };
 
-async function logInAsOwner(page: Page) {
+async function logIn(page: Page, who: { email: string; password: string; name: string }) {
   await page.goto("/");
   await page.getByRole("button", { name: "회원가입 · 로그인" }).click();
-  await page.getByPlaceholder("아이디").fill(OWNER.username);
-  await page.getByPlaceholder("비밀번호").fill(OWNER.password);
+  await page.getByPlaceholder("이메일").fill(who.email);
+  await page.getByPlaceholder("비밀번호", { exact: true }).fill(who.password);
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page.getByText(OWNER.name).first()).toBeVisible();
+  await expect(page.getByText(who.name).first()).toBeVisible();
 }
 
-test("a visitor sees the club without logging in", async ({ page }) => {
+test("a visitor sees the venues and the booking grid without logging in", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "회원가입 · 로그인" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "코트 예약" })).toBeVisible();
+  await expect(page.getByRole("combobox")).toContainText("Yongsan Mmove");
+  await expect(page.getByRole("button", { name: "예약 가능", exact: true }).first()).toBeVisible();
 });
 
-test("the owner can add a player, generate a schedule and enter a score", async ({ page }) => {
-  await logInAsOwner(page);
-
-  const guest = `E2E ${Date.now()}`;
-  await page.getByRole("button", { name: "선수 · 팀" }).click();
-  await page.getByPlaceholder("이름 입력").fill(guest);
-  await page.getByPlaceholder("이름 입력").press("Enter");
-  await expect(page.getByText(guest)).toBeVisible();
-
-  await page.getByRole("button", { name: "대진표", exact: true }).click();
-  // Generating stores the rounds, then re-reads them; wait for both before typing a score.
-  const matches = (method: string) =>
-    page.waitForResponse((r) => r.request().method() === method && r.url().includes("/rest/v1/matches"));
-  const stored = matches("POST");
-  await page.getByRole("button", { name: /대진표 (다시 )?생성/ }).click();
-  await stored;
-  await matches("GET");
-  await expect(page.getByText("ROUND 1")).toBeVisible();
-
-  const firstScore = page.getByPlaceholder("-").first();
-  const scoreSaved = matches("PATCH");
-  await firstScore.fill("7");
-  await scoreSaved;
-
-  // The schedule and the score are stored, not just in memory.
-  await page.reload();
-  await page.getByRole("button", { name: "대진표", exact: true }).click();
-  await expect(page.getByText("ROUND 1")).toBeVisible();
-  await expect(firstScore).toHaveValue("7");
-});
-
-test("the owner can book a free court slot", async ({ page }) => {
-  await logInAsOwner(page);
+test("the owner can book a free court slot and see it in their schedule", async ({ page }) => {
+  await logIn(page, OWNER);
 
   const freeSlots = page.getByRole("button", { name: "예약 가능", exact: true });
   const before = await freeSlots.count();
-  await freeSlots.first().click();
+  await freeSlots.last().click();
   await page.getByRole("button", { name: "예약하기" }).click();
 
-  // The slot now shows as partly booked, in the grid and after a reload.
+  // The slot now shows as partly booked (1 of 6), and still does after a reload.
   await expect(freeSlots).toHaveCount(before - 1);
   await page.reload();
-  await expect(page.getByRole("button", { name: /3자리 남음/ }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /5자리 남음/ }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "내 일정" }).click();
+  await expect(page.getByText("Yongsan Mmove · 코트").first()).toBeVisible();
 });

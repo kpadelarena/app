@@ -1,13 +1,18 @@
-import type { BookingCategory } from "@/lib/types";
+import type { BookingKind } from "@/lib/types";
 
-export const CATEGORIES: { key: BookingCategory; label: string; color: string }[] = [
-  { key: "rental", label: "대관", color: "#8B5CF6" },
+export const KINDS: { key: BookingKind; label: string; color: string }[] = [
   { key: "match", label: "매치", color: "#16A34A" },
-  { key: "league", label: "리그매치", color: "#D97706" },
   { key: "lesson", label: "레슨", color: "#E4574B" },
+  { key: "league", label: "리그", color: "#D97706" },
 ];
 
-export const categoryOf = (key: string) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
+export const kindOf = (key: BookingKind) => KINDS.find((k) => k.key === key) ?? KINDS[0];
 
-/** Players per court booking (doubles). */
-export const BOOKING_SLOTS_PER_MATCH = 4;
+/** Members can join or leave a booking until this long before it starts. */
+export const CHANGE_CUTOFF_HOURS = 24;
+
+export const changesOpen = (startsAt: string, now = Date.now()) =>
+  now < new Date(startsAt).getTime() - CHANGE_CUTOFF_HOURS * 3_600_000;
+
+/** How many days the booking calendar shows, starting today. */
+export const DAYS_AHEAD = 7;

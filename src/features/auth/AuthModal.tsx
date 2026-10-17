@@ -5,34 +5,41 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PhotoInput } from "@/components/ui/PhotoInput";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import type { Member } from "@/lib/types";
+import type { Contact, Member } from "@/lib/types";
 import { C } from "@/styles/tokens";
-import { REGIONS } from "./constants";
 import { LevelSlider } from "./LevelSlider";
 
 export interface SignUpForm {
   name: string;
-  username: string;
-  password: string;
-  phone: string;
   email: string;
-  gender: string;
-  region: string;
+  password: string;
   level: number;
-  /** A pasted image URL; a picked file is uploaded separately once the account exists. */
-  photo: string | null;
+  phone: string;
 }
 
+export type AuthOutcome = { error?: string; signedIn?: boolean };
+
 interface AuthModalProps {
-  currentMember: Member | null;
-  onLoginWithPassword: (username: string, password: string) => Promise<{ error?: string }>;
+  member: Member | null;
+  contact: Contact | null;
+  onLogIn: (email: string, password: string) => Promise<AuthOutcome>;
   onLogout: () => void;
-  onSignUp: (form: SignUpForm) => Promise<{ error?: string }>;
+  onSignUp: (form: SignUpForm) => Promise<AuthOutcome>;
   onUploadProfilePhoto: (file: File) => void | Promise<void>;
   onSetProfilePhotoUrl: (url: string) => void;
   onUpdateLevel: (level: number) => void;
   profileUploading: boolean;
   onClose: () => void;
+}
+
+const MIN_PASSWORD = 6;
+
+/* Supabase's English auth errors, in the user's language. */
+function signUpError(message: string) {
+  if (/already registered|already exists/i.test(message)) return "이미 가입된 이메일이에요.";
+  if (/password/i.test(message)) return `비밀번호는 ${MIN_PASSWORD}자 이상으로 입력해 주세요.`;
+  if (/email/i.test(message)) return "이메일 주소를 확인해 주세요.";
+  return "가입에 실패했어요. 잠시 후 다시 시도해 주세요.";
 }
 
 function Avatar({ photo, alt, size }: { photo: string | null; alt: string; size: number }) {
@@ -56,9 +63,12 @@ function Avatar({ photo, alt, size }: { photo: string | null; alt: string; size:
   );
 }
 
+const linkButtonStyle = { background: "none", border: "none", cursor: "pointer", fontSize: 13 } as const;
+
 export function AuthModal({
-  currentMember,
-  onLoginWithPassword,
+  member,
+  contact,
+  onLogIn,
   onLogout,
   onSignUp,
   onUploadProfilePhoto,
@@ -67,80 +77,66 @@ export function AuthModal({
   profileUploading,
   onClose,
 }: AuthModalProps) {
-  const [mode, setMode] = useState<"profile" | "login" | "signup">(currentMember ? "profile" : "login");
+  const [mode, setMode] = useState<"profile" | "login" | "signup">(member ? "profile" : "login");
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [gender, setGender] = useState("");
-  const [region, setRegion] = useState("");
   const [level, setLevel] = useState(3.0);
-  const [signupPhoto, setSignupPhoto] = useState<string | null>(null); // preview: object URL or pasted URL
-  const [signupPhotoFile, setSignupPhotoFile] = useState<File | null>(null); // raw File, uploaded after account exists
+  const [signupPhotoFile, setSignupPhotoFile] = useState<File | null>(null); // uploaded once the account exists
   const [signupError, setSignupError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const [loginUsername, setLoginUsername] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginNotice, setLoginNotice] = useState("");
 
   const submitSignUp = async () => {
-    const trimmed = name.trim();
-    const trimmedUsername = username.trim();
     setSignupError("");
-    if (!trimmed) return;
-    if (!trimmedUsername) {
-      setSignupError("아이디를 입력해 주세요.");
+    if (!name.trim()) return;
+    if (!email.includes("@")) {
+      setSignupError("이메일 주소를 확인해 주세요.");
       return;
     }
-    if (password.length < 4) {
-      setSignupError("비밀번호는 4자 이상으로 입력해 주세요.");
+    if (password.length < MIN_PASSWORD) {
+      setSignupError(`비밀번호는 ${MIN_PASSWORD}자 이상으로 입력해 주세요.`);
       return;
     }
     if (password !== passwordConfirm) {
       setSignupError("비밀번호가 일치하지 않아요.");
       return;
     }
-    const result = await onSignUp({
-      name: trimmed,
-      username: trimmedUsername,
-      password,
-      phone,
-      email,
-      gender,
-      region,
-      level,
-      // A pasted URL can be saved immediately; a picked file needs a
-      // real account to exist first, so it's uploaded just below instead.
-      photo: signupPhotoFile ? null : signupPhoto,
-    });
-    if (result && result.error === "duplicate_username") {
-      setSignupError("이미 사용 중인 아이디예요.");
+    setBusy(true);
+    const result = await onSignUp({ name: name.trim(), email: email.trim(), password, level, phone: phone.trim() });
+    setBusy(false);
+    if (result.error) {
+      setSignupError(signUpError(result.error));
       return;
     }
-    if (result && result.error) {
-      setSignupError("가입에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    if (!result.signedIn) {
+      // Email confirmation is on: the account exists but can't be used yet.
+      setLoginEmail(email.trim());
+      setLoginNotice("가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.");
+      setMode("login");
       return;
     }
-    if (signupPhotoFile) {
-      await onUploadProfilePhoto(signupPhotoFile);
-    }
+    if (signupPhotoFile) await onUploadProfilePhoto(signupPhotoFile);
     setMode("profile");
   };
 
   const submitLogin = async () => {
     setLoginError("");
-    if (!loginUsername.trim() || !loginPassword) {
-      setLoginError("아이디와 비밀번호를 입력해 주세요.");
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError("이메일과 비밀번호를 입력해 주세요.");
       return;
     }
-    setLoginBusy(true);
-    const result = await onLoginWithPassword(loginUsername, loginPassword);
-    setLoginBusy(false);
-    if (result && result.error) {
-      setLoginError("아이디 또는 비밀번호가 올바르지 않아요.");
+    setBusy(true);
+    const result = await onLogIn(loginEmail, loginPassword);
+    setBusy(false);
+    if (result.error) {
+      setLoginError("이메일 또는 비밀번호가 올바르지 않아요.");
       return;
     }
     onClose();
@@ -153,28 +149,28 @@ export function AuthModal({
       zIndex={60}
       onClose={onClose}
     >
-      {mode === "profile" && currentMember && (
+      {mode === "profile" && member && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Avatar photo={currentMember.photo} alt={currentMember.name} size={64} />
+            <Avatar photo={member.photo} alt={member.name} size={64} />
             <div>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>{currentMember.name}</div>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>{member.name}</div>
               <div style={{ fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-                Lv.{currentMember.level.toFixed(1)}
-                {currentMember.phone ? ` · ${currentMember.phone}` : ""}
-                {currentMember.email ? ` · ${currentMember.email}` : ""}
+                Lv.{member.level.toFixed(1)}
+                {contact?.email ? ` · ${contact.email}` : ""}
+                {contact?.phone ? ` · ${contact.phone}` : ""}
               </div>
             </div>
           </div>
 
           <PhotoInput
-            label={currentMember.photo ? "프로필 사진 교체" : "프로필 사진 추가"}
+            label={member.photo ? "프로필 사진 교체" : "프로필 사진 추가"}
             uploading={profileUploading}
             onFile={onUploadProfilePhoto}
             onSetUrl={onSetProfilePhotoUrl}
           />
 
-          <LevelSlider value={currentMember.level} onChange={onUpdateLevel} />
+          <LevelSlider value={member.level} onChange={onUpdateLevel} />
 
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <PrimaryButton onClick={onLogout} icon={LogOut} style={{ background: C.danger, color: "#fff" }}>
@@ -186,10 +182,12 @@ export function AuthModal({
 
       {mode === "login" && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          {loginNotice && <div style={{ fontSize: 12, color: C.turf }}>{loginNotice}</div>}
           <input
-            value={loginUsername}
-            onChange={(e) => setLoginUsername(e.target.value)}
-            placeholder="아이디"
+            type="email"
+            value={loginEmail}
+            onChange={(e) => setLoginEmail(e.target.value)}
+            placeholder="이메일"
             autoCapitalize="off"
             style={fieldStyle}
           />
@@ -202,20 +200,12 @@ export function AuthModal({
             style={fieldStyle}
           />
           {loginError && <div style={{ fontSize: 12, color: C.danger }}>{loginError}</div>}
-          <PrimaryButton onClick={submitLogin} disabled={loginBusy}>
-            {loginBusy ? "확인 중..." : "로그인"}
+          <PrimaryButton onClick={submitLogin} disabled={busy}>
+            {busy ? "확인 중..." : "로그인"}
           </PrimaryButton>
           <button
             onClick={() => setMode("signup")}
-            style={{
-              marginTop: 8,
-              background: "none",
-              border: "none",
-              color: C.turf,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
+            style={{ ...linkButtonStyle, marginTop: 8, color: C.turf, fontWeight: 700 }}
           >
             + 새 회원가입
           </button>
@@ -225,26 +215,21 @@ export function AuthModal({
       {mode === "signup" && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Avatar photo={signupPhoto} alt="" size={56} />
+            <Avatar photo={signupPhotoFile ? URL.createObjectURL(signupPhotoFile) : null} alt="" size={56} />
             <PhotoInput
               label="프로필 사진"
               uploading={false}
-              onFile={(file) => {
-                setSignupPhotoFile(file);
-                setSignupPhoto(URL.createObjectURL(file));
-              }}
-              onSetUrl={(url) => {
-                setSignupPhotoFile(null);
-                setSignupPhoto(url);
-              }}
+              onFile={setSignupPhotoFile}
+              onSetUrl={(url) => onSetProfilePhotoUrl(url)}
             />
           </div>
 
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름" style={fieldStyle} />
           <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="아이디"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일"
             autoCapitalize="off"
             style={fieldStyle}
           />
@@ -252,7 +237,7 @@ export function AuthModal({
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호 (4자 이상)"
+            placeholder={`비밀번호 (${MIN_PASSWORD}자 이상)`}
             style={fieldStyle}
           />
           <input
@@ -262,54 +247,10 @@ export function AuthModal({
             placeholder="비밀번호 확인"
             style={fieldStyle}
           />
-          <select
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            style={{ ...fieldStyle, color: region ? C.charcoal : "rgba(27,36,34,0.4)" }}
-          >
-            <option value="">지역 선택 (선택)</option>
-            {REGIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-          <div style={{ display: "flex", gap: 6 }}>
-            {[
-              { key: "male", label: "Male" },
-              { key: "female", label: "Female" },
-            ].map((g) => (
-              <button
-                key={g.key}
-                type="button"
-                onClick={() => setGender(g.key)}
-                style={{
-                  flex: 1,
-                  padding: "9px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${gender === g.key ? C.turf : "rgba(0,0,0,0.15)"}`,
-                  background: gender === g.key ? C.turf : "transparent",
-                  color: gender === g.key ? "#fff" : C.charcoal,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {g.label}
-              </button>
-            ))}
-          </div>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="이메일 (선택)"
-            style={fieldStyle}
-          />
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="연락처 (선택)"
+            placeholder="연락처 (선택, 관리자에게만 보여요)"
             style={fieldStyle}
           />
           <LevelSlider value={level} onChange={setLevel} />
@@ -319,14 +260,11 @@ export function AuthModal({
           <PrimaryButton
             onClick={submitSignUp}
             icon={UserPlus}
-            disabled={!name.trim() || !username.trim() || password.length < 4}
+            disabled={busy || !name.trim() || !email.trim() || password.length < MIN_PASSWORD}
           >
-            가입하기
+            {busy ? "가입 중..." : "가입하기"}
           </PrimaryButton>
-          <button
-            onClick={() => setMode("login")}
-            style={{ background: "none", border: "none", color: "rgba(27,36,34,0.5)", fontSize: 13, cursor: "pointer" }}
-          >
+          <button onClick={() => setMode("login")} style={{ ...linkButtonStyle, color: "rgba(27,36,34,0.5)" }}>
             이미 계정이 있어요
           </button>
         </div>

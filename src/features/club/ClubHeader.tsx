@@ -1,28 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Settings2, Share2, Trophy } from "lucide-react";
+import { ChevronDown, Share2, Trophy } from "lucide-react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
-import type { League, LeagueFormat } from "@/lib/types";
+import type { Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
-import { FORMATS, VENUES } from "./constants";
-import type { SaveStatus } from "./useClub";
-
-const SAVE_INDICATOR: Record<SaveStatus, { dot: string; label: string }> = {
-  idle: { dot: "rgba(255,255,255,0.3)", label: "" },
-  saving: { dot: C.ball, label: "저장 중" },
-  saved: { dot: C.ball, label: "실시간 저장됨" },
-  error: { dot: C.danger, label: "저장 실패" },
-};
-
-function SaveIndicator({ status }: { status: SaveStatus }) {
-  const { dot, label } = SAVE_INDICATOR[status];
-  if (!label) return <div />;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, display: "inline-block" }} />
-      {label}
-    </div>
-  );
-}
+import { CLUB_NAME } from "./constants";
 
 /* Uses the native share sheet where there is one, otherwise copies the link. */
 function ShareButton() {
@@ -30,8 +11,8 @@ function ShareButton() {
 
   const share = async () => {
     const shareData = {
-      title: "K-Padel Arena Manager",
-      text: "코트 예약 · 리그 · 순위를 한눈에 — K-Padel Arena Manager",
+      title: `${CLUB_NAME} Manager`,
+      text: `코트 예약 · 리그 · 순위를 한눈에 — ${CLUB_NAME}`,
       url: window.location.href,
     };
     try {
@@ -75,43 +56,7 @@ function ShareButton() {
   );
 }
 
-const nameStyle = { fontFamily: FONT.display, fontSize: 28, fontWeight: 700 };
-
-/* The club name; click to edit in place, blur or Enter to save. */
-function ClubName({ name, onRename }: { name: string; onRename: (name: string) => void }) {
-  const [draft, setDraft] = useState<string | null>(null); // null = not editing
-
-  if (draft === null) {
-    return (
-      <h1 onClick={() => setDraft(name)} style={{ ...nameStyle, margin: 0, cursor: "text" }}>
-        {name}
-      </h1>
-    );
-  }
-  return (
-    <input
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        setDraft(null);
-        if (draft !== name) onRename(draft);
-      }}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      style={{
-        ...nameStyle,
-        background: "transparent",
-        border: "none",
-        borderBottom: `2px solid ${C.ball}`,
-        color: "#fff",
-        outline: "none",
-        padding: "2px 0",
-      }}
-    />
-  );
-}
-
-function VenueSelect({ value, onChange }: { value: string; onChange: (venue: string) => void }) {
+function VenueSelect({ venues, value, onChange }: { venues: Venue[]; value: string; onChange: (id: string) => void }) {
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
       <select
@@ -131,9 +76,9 @@ function VenueSelect({ value, onChange }: { value: string; onChange: (venue: str
           cursor: "pointer",
         }}
       >
-        {VENUES.map((v) => (
-          <option key={v} value={v} style={{ color: C.charcoal }}>
-            {v}
+        {venues.map((v) => (
+          <option key={v.id} value={v.id} style={{ color: C.charcoal }}>
+            {v.name}
           </option>
         ))}
       </select>
@@ -146,128 +91,36 @@ function VenueSelect({ value, onChange }: { value: string; onChange: (venue: str
   );
 }
 
-interface FormatPillProps {
-  label: string;
-  tooltip: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-function FormatPill({ active, onClick, label, tooltip }: FormatPillProps) {
-  return (
-    <button
-      onClick={onClick}
-      title={tooltip}
-      style={{
-        padding: "7px 12px",
-        borderRadius: 999,
-        border: `1px solid ${active ? C.ball : "rgba(255,255,255,0.25)"}`,
-        background: active ? "rgba(215,241,59,0.12)" : "transparent",
-        color: active ? C.ball : "rgba(255,255,255,0.65)",
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: "pointer",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-const stepButtonStyle = {
-  background: "none",
-  border: "none",
-  color: C.ball,
-  fontSize: 16,
-  cursor: "pointer",
-  width: 18,
-};
-
-function CourtStepper({ value, onChange }: { value: number; onChange: (count: number) => void }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "5px 10px",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.25)",
-      }}
-    >
-      <Settings2 size={13} color="rgba(255,255,255,0.6)" />
-      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>코트</span>
-      <button onClick={() => onChange(Math.max(1, value - 1))} style={stepButtonStyle}>
-        −
-      </button>
-      <span style={{ fontFamily: FONT.mono, fontWeight: 700, color: "#fff", width: 14, textAlign: "center" }}>
-        {value}
-      </span>
-      <button onClick={() => onChange(Math.min(8, value + 1))} style={stepButtonStyle}>
-        +
-      </button>
-    </div>
-  );
-}
-
 interface ClubHeaderProps {
-  league: Pick<League, "name" | "venue" | "format" | "courtCount">;
-  saveStatus: SaveStatus;
-  onRename: (name: string) => void;
-  onChangeVenue: (venue: string) => void;
-  onChangeFormat: (format: LeagueFormat) => void;
-  onChangeCourtCount: (count: number) => void;
-  /** Shown at the right of the settings row. */
+  venues: Venue[];
+  venueId: string;
+  onSelectVenue: (id: string) => void;
+  /** Shown at the right of the venue row. */
   account: ReactNode;
   /** Shown along the bottom edge. */
   tabs: ReactNode;
 }
 
-/* The dark page header: brand, club name and settings, account button and tabs. */
-export function ClubHeader({
-  league,
-  saveStatus,
-  onRename,
-  onChangeVenue,
-  onChangeFormat,
-  onChangeCourtCount,
-  account,
-  tabs,
-}: ClubHeaderProps) {
+/* The dark page header: brand, club name, venue switcher, account button and tabs. */
+export function ClubHeader({ venues, venueId, onSelectVenue, account, tabs }: ClubHeaderProps) {
   return (
     <div style={{ background: C.ink, color: "#fff", padding: "20px 20px 0" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Trophy size={18} color={C.ball} />
-            <Eyebrow>K-PADEL ARENA MANAGER</Eyebrow>
+            <Eyebrow>{CLUB_NAME.toUpperCase()} MANAGER</Eyebrow>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <img src="/brand-logo.jpg" alt="K-Padel Arena" style={{ width: 108, height: 27, objectFit: "contain" }} />
-            <SaveIndicator status={saveStatus} />
+            <img src="/brand-logo.jpg" alt={CLUB_NAME} style={{ width: 108, height: 27, objectFit: "contain" }} />
             <ShareButton />
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-          <ClubName name={league.name} onRename={onRename} />
-        </div>
+        <h1 style={{ fontFamily: FONT.display, fontSize: 28, fontWeight: 700, margin: "8px 0 0" }}>{CLUB_NAME}</h1>
 
-        <div style={{ marginTop: 10 }}>
-          <VenueSelect value={league.venue} onChange={onChangeVenue} />
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
-          {FORMATS.map((f) => (
-            <FormatPill
-              key={f.key}
-              label={f.label}
-              tooltip={f.tooltip}
-              active={league.format === f.key}
-              onClick={() => onChangeFormat(f.key)}
-            />
-          ))}
-          <CourtStepper value={league.courtCount} onChange={onChangeCourtCount} />
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <VenueSelect venues={venues} value={venueId} onChange={onSelectVenue} />
           <div style={{ flex: 1 }} />
           {account}
         </div>
