@@ -46,46 +46,58 @@ http://localhost:3000 에서 확인. 개발용 로그인 계정은
 아직 배포된 DB가 없으므로 지금은 기존 파일을 직접 고칩니다. 첫 배포 이후에는
 이미 적용된 파일은 절대 수정하지 말고 새 파일을 추가해야 합니다.
 
-## 배포 설정
+## 배포
 
-### 1. Supabase 프로젝트 만들기
+운영 Supabase 프로젝트: `flfnqurjjjhynizkkpet`
+(https://flfnqurjjjhynizkkpet.supabase.co, 서울 리전, K-Padel Arena 조직).
+프론트엔드는 Vercel에 배포합니다.
 
-[supabase.com](https://supabase.com) → **New project** → 이름, 비밀번호,
-리전(서울 `ap-northeast-2` 추천) 설정.
+### 1. 마이그레이션은 GitHub Actions가 적용합니다
 
-### 2. 마이그레이션 적용
+`.github/workflows/supabase.yml`:
 
-```
-pnpm supabase login
-pnpm supabase link --project-ref <프로젝트 ref>
-pnpm supabase db push
-```
+- PR에서 `supabase/`가 바뀌면 로컬 DB를 띄워 `supabase/tests/`의 테스트를 실행합니다.
+- `main`에 머지되면 `supabase db push`로 운영 프로젝트에 새 마이그레이션을 적용합니다.
+  시드 데이터는 적용되지 않습니다. 운영 데이터(지점, 코트, 첫 관리자)는 직접 넣습니다.
 
-`supabase/migrations/`의 SQL(테이블, 보안 정책(RLS), 사진 저장용 Storage
-버킷)이 순서대로 적용됩니다. 시드 데이터는 적용되지 않습니다.
+저장소 Secrets(Settings → Secrets and variables → Actions)에 세 값이 필요합니다:
 
-### 3. 이메일 인증 끄기
+| Secret                  | 값                                                        |
+| ----------------------- | --------------------------------------------------------- |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com/dashboard/account/tokens 에서 만든 개인 토큰 |
+| `SUPABASE_DB_PASSWORD`  | 프로젝트 생성 때 정한 데이터베이스 비밀번호               |
+| `SUPABASE_PROJECT_ID`   | 프로젝트 ref (`flfnqurjjjhynizkkpet`)                     |
 
-로그인은 아이디+비밀번호 방식이고, 내부적으로는
-`아이디@padelconnect.invalid`라는 존재하지 않는 이메일 주소로 Supabase
-Auth에 가입됩니다. 실제 이메일이 아니므로 이메일 인증을 꺼야 합니다.
+수동으로 적용하려면: `pnpm supabase login` → `pnpm supabase link --project-ref <ref>`
+→ `pnpm supabase db push`.
 
-**Authentication → Providers → Email → "Confirm email" OFF** → Save.
+### 2. 첫 관리자
 
-(켜둔 채로 두면 모든 회원가입이 "이메일을 확인해 주세요" 상태에서
-멈춥니다.)
+운영 DB에서는 **가장 먼저 가입한 계정이 owner**가 됩니다. 배포 직후 바로 가입하세요.
+이후 가입자는 member이며, owner가 역할을 바꿉니다.
 
-### 4. 환경변수 설정
+### 3. 이메일 인증
 
-**Project Settings → API**에서 두 값을 복사합니다.
+회원가입은 실제 이메일 주소로 하므로 **Authentication → Providers → Email**의
+"Confirm email"은 켜 둡니다(기본값). 앱이 "확인 메일을 보냈어요" 안내를 띄웁니다.
+Supabase 기본 메일 발송은 시간당 몇 통으로 제한되므로, 가입이 많아지면
+Resend 같은 SMTP를 **Project Settings → Auth → SMTP**에 연결하세요.
 
-| Key                             | Value           |
-| ------------------------------- | --------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Project URL     |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
+### 4. Vercel 환경변수
 
-호스팅 서비스의 환경변수 설정에 두 값을 추가한 뒤 배포하세요. 빌드할 때
-앱에 포함되는 값이라, 없으면 빌드가 실패합니다.
+Vercel 프로젝트(Production, Preview 모두)에 두 값을 넣습니다. 빌드할 때 앱에
+포함되는 값이라, 없으면 빌드가 실패합니다.
+
+| Key                             | Value                                          |
+| ------------------------------- | ---------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | `https://flfnqurjjjhynizkkpet.supabase.co`     |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API의 anon(publishable) key |
+
+### 5. Auth URL 설정
+
+Supabase **Authentication → URL Configuration**: Site URL은 Vercel 운영 주소,
+Redirect URLs에 `https://*-kpadelarena.vercel.app/**`(프리뷰)와
+`http://localhost:3000/**`(로컬)을 추가합니다.
 
 (anon key는 브라우저에 노출돼도 안전합니다 — 실제 접근 제어는 RLS 정책이
 담당합니다.)
