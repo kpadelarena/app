@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { SectionCard } from "@/components/ui/SectionCard";
-import type { NewBooking, Who } from "@/lib/db";
+import type { BookingPatch, NewBooking, Who } from "@/lib/db";
 import type { Booking, Member, Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { DAYS_AHEAD, KINDS, kindOf } from "./constants";
@@ -120,6 +120,8 @@ interface BookingTabProps {
   onCreate: (booking: NewBooking) => void;
   onJoin: (bookingId: string, who: Who) => void;
   onLeave: (participantId: string) => void;
+  onUpdate: (bookingId: string, patch: BookingPatch) => void;
+  onDelete: (bookingId: string) => void;
   onOpenAuth: () => void;
 }
 
@@ -132,6 +134,8 @@ export function BookingTab({
   onCreate,
   onJoin,
   onLeave,
+  onUpdate,
+  onDelete,
   onOpenAuth,
 }: BookingTabProps) {
   const days = useMemo(() => nextDays(DAYS_AHEAD, venue.timezone), [venue.timezone]);
@@ -272,6 +276,18 @@ export function BookingTab({
           }}
           onJoin={(who) => activeBooking && onJoin(activeBooking.id, who)}
           onLeave={onLeave}
+          onUpdate={(patch) => {
+            if (!activeBooking) return;
+            onUpdate(activeBooking.id, patch);
+            // A moved booking no longer belongs to the open cell.
+            if (patch.startsAt) setActiveSlot(null);
+          }}
+          onDelete={() => {
+            if (activeBooking) {
+              onDelete(activeBooking.id);
+              setActiveSlot(null);
+            }
+          }}
           onOpenAuth={onOpenAuth}
           onClose={() => setActiveSlot(null)}
         />

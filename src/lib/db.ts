@@ -195,6 +195,30 @@ export async function createBooking({ courtId, startsAt, endsAt, kind, visibilit
   if (error) throw error;
 }
 
+export interface BookingPatch {
+  startsAt?: Date;
+  endsAt?: Date;
+  kind?: BookingKind;
+  visibility?: Visibility;
+}
+
+/* Admins only (row-level security). Overlaps are rejected by the database. */
+export async function updateBooking(bookingId: string, patch: BookingPatch) {
+  const row: TablesUpdate<"bookings"> = {};
+  if (patch.startsAt) row.starts_at = patch.startsAt.toISOString();
+  if (patch.endsAt) row.ends_at = patch.endsAt.toISOString();
+  if (patch.kind) row.kind = patch.kind;
+  if (patch.visibility) row.visibility = patch.visibility;
+  const { error } = await supabase.from("bookings").update(row).eq("id", bookingId);
+  if (error) throw error;
+}
+
+/* Admins only; participants go with it. */
+export async function deleteBooking(bookingId: string) {
+  const { error } = await supabase.from("bookings").delete().eq("id", bookingId);
+  if (error) throw error;
+}
+
 export type Who = { profileId: string } | { guestName: string };
 
 export async function addParticipant(bookingId: string, who: Who, addedBy: string) {
@@ -217,13 +241,14 @@ export async function removeParticipant(participantId: string) {
 export async function getMyBookings(profileId: string, from: Date): Promise<MyBooking[]> {
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, starts_at, ends_at, kind, booking_participants!inner(profile_id), courts(name, venues(name))")
+    .select("id, starts_at, ends_at, kind, booking_participants!inner(id, profile_id), courts(name, venues(name))")
     .eq("booking_participants.profile_id", profileId)
     .gt("ends_at", from.toISOString())
     .order("starts_at");
   if (error) throw error;
   return data.map((row) => ({
     id: row.id,
+    participantId: row.booking_participants[0]?.id ?? "",
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     kind: row.kind,

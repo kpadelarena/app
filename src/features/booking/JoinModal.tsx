@@ -5,12 +5,12 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { getMembers, type Who } from "@/lib/db";
+import { getMembers, type BookingPatch, type Who } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
 import type { Booking, BookingKind, Member, Participant, Venue, Visibility } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { CHANGE_CUTOFF_HOURS, KINDS, changesOpen, kindOf } from "./constants";
-import { zonedTime, type Slot } from "./slots";
+import { addHours, hoursBetween, toInstant, zonedDate, zonedTime, type Slot } from "./slots";
 
 const VISIBILITIES: { key: Visibility; label: string; hint: string }[] = [
   { key: "public", label: "공개", hint: "누구나 참여할 수 있어요" },
@@ -41,8 +41,118 @@ interface JoinModalProps {
   onCreate: (hours: number, kind: BookingKind, visibility: Visibility) => void;
   onJoin: (who: Who) => void;
   onLeave: (participantId: string) => void;
+  /** Admins only: change the booking itself. */
+  onUpdate: (patch: BookingPatch) => void;
+  onDelete: () => void;
   onOpenAuth: () => void;
   onClose: () => void;
+}
+
+/* Admin-only controls for an existing booking: kind, visibility, time, delete. */
+function AdminControls({
+  venue,
+  booking,
+  onUpdate,
+  onDelete,
+}: {
+  venue: Venue;
+  booking: Booking;
+  onUpdate: (patch: BookingPatch) => void;
+  onDelete: () => void;
+}) {
+  const date = zonedDate(new Date(booking.startsAt), venue.timezone);
+  const currentStart = zonedTime(new Date(booking.startsAt), venue.timezone);
+  const currentHours = Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3_600_000);
+  const [start, setStart] = useState(currentStart);
+  const [hours, setHours] = useState(currentHours);
+  const hourOptions = hoursBetween(venue.openTime, venue.closeTime);
+  const maxHours = Math.max(1, hourOptions.length - hourOptions.indexOf(start));
+  const timeChanged = start !== currentStart || hours !== currentHours;
+
+  const saveTime = () => {
+    const startsAt = toInstant(date, start, venue.timezone);
+    onUpdate({ startsAt, endsAt: addHours(startsAt, hours) });
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 20,
+        paddingTop: 14,
+        borderTop: "1px dashed rgba(0,0,0,0.15)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <Eyebrow color={C.charcoal}>관리자</Eyebrow>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {KINDS.map((k) => (
+          <button
+            key={k.key}
+            onClick={() => k.key !== booking.kind && onUpdate({ kind: k.key })}
+            style={chipStyle(booking.kind === k.key, k.color)}
+          >
+            {k.label}
+          </button>
+        ))}
+        <span style={{ width: 8 }} />
+        {VISIBILITIES.map((v) => (
+          <button
+            key={v.key}
+            onClick={() => v.key !== booking.visibility && onUpdate({ visibility: v.key })}
+            title={v.hint}
+            style={chipStyle(booking.visibility === v.key, C.turf)}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <select value={start} onChange={(e) => setStart(e.target.value)} style={{ ...fieldStyle, padding: "8px 10px" }}>
+          {hourOptions.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+        <select
+          value={Math.min(hours, maxHours)}
+          onChange={(e) => setHours(Number(e.target.value))}
+          style={{ ...fieldStyle, padding: "8px 10px" }}
+        >
+          {Array.from({ length: maxHours }, (_, i) => i + 1).map((h) => (
+            <option key={h} value={h}>
+              {h}시간
+            </option>
+          ))}
+        </select>
+        <PrimaryButton onClick={saveTime} disabled={!timeChanged} style={{ padding: "8px 14px" }}>
+          시간 변경
+        </PrimaryButton>
+      </div>
+
+      <div>
+        <button
+          onClick={() => window.confirm("이 예약을 삭제할까요? 참여자 모두에게서 사라져요.") && onDelete()}
+          style={{
+            background: "none",
+            border: `1px solid ${C.danger}`,
+            color: C.danger,
+            borderRadius: 10,
+            padding: "8px 14px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          예약 삭제
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* Opened from a grid cell: book the slot, or join / leave the booking in it. */
@@ -56,6 +166,8 @@ export function JoinModal({
   onCreate,
   onJoin,
   onLeave,
+  onUpdate,
+  onDelete,
   onOpenAuth,
   onClose,
 }: JoinModalProps) {
@@ -266,6 +378,8 @@ export function JoinModal({
               </PrimaryButton>
             </div>
           )}
+
+          {isAdmin && <AdminControls venue={venue} booking={booking} onUpdate={onUpdate} onDelete={onDelete} />}
         </>
       )}
     </BottomSheet>

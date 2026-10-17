@@ -69,6 +69,8 @@ export interface Booking {
 /** One of the signed-in member's own bookings, with where it is. */
 export interface MyBooking {
   id: string;
+  /** The member's own participant row, for leaving. */
+  participantId: string;
   startsAt: string;
   endsAt: string;
   kind: BookingKind;
