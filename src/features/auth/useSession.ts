@@ -13,7 +13,7 @@ import { setAvatarUrl, updateContactPhone, updateProfileLevel, uploadAvatar } fr
 import { queryKeys } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabaseClient";
 import type { Member } from "@/lib/types";
-import type { SignUpForm } from "./AuthModal";
+import type { SignUpForm } from "./AccountPage";
 
 export type AuthOutcome = { error: string } | { userId: string; signedIn: boolean };
 
@@ -102,10 +102,10 @@ export function useSession() {
     return result.error ? { error: result.error.message } : {};
   }, []);
 
-  /* A full reload after signing out drops every cached view and any open sheet. */
-  const logOut = useCallback(async () => {
+  /* A full page load after signing out drops every cached view and any open sheet. */
+  const logOut = useCallback(async (redirectTo?: string) => {
     await signOut();
-    window.location.reload();
+    window.location.assign(redirectTo ?? window.location.pathname);
   }, []);
 
   /* The current member id straight from the cache, so an action started

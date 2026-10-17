@@ -10,6 +10,7 @@ import { FORMATS } from "@/features/club/constants";
 import type { NewLeague } from "@/lib/db";
 import type { LeagueFormat, LeagueSummary, Member } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
+import { type LeagueTabKey } from "@/features/club/routes";
 import { formatEventDate, todayDate } from "./eventDate";
 import { PlayersTab } from "./PlayersTab";
 import { ScheduleTab } from "./ScheduleTab";
@@ -134,10 +135,12 @@ const DETAIL_TABS = [
   { key: "schedule", label: "대진표" },
   { key: "standings", label: "순위" },
 ] as const;
-type DetailTab = (typeof DETAIL_TABS)[number]["key"];
+type DetailTab = LeagueTabKey;
 
 interface LeagueDetailProps {
   leagueId: string;
+  tab: DetailTab;
+  onTab: (tab: DetailTab) => void;
   member: Member | null;
   isAdmin: boolean;
   onBack: () => void;
@@ -145,8 +148,7 @@ interface LeagueDetailProps {
   onOpenAuth: () => void;
 }
 
-function LeagueDetail({ leagueId, member, isAdmin, onBack, onDelete, onOpenAuth }: LeagueDetailProps) {
-  const [tab, setTab] = useState<DetailTab>("players");
+function LeagueDetail({ leagueId, tab, onTab, member, isAdmin, onBack, onDelete, onOpenAuth }: LeagueDetailProps) {
   const lg = useLeague(leagueId, member?.id ?? null);
   const { league } = lg;
 
@@ -211,7 +213,7 @@ function LeagueDetail({ leagueId, member, isAdmin, onBack, onDelete, onOpenAuth 
             {member ? (
               <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                 {DETAIL_TABS.map((t) => (
-                  <button key={t.key} onClick={() => setTab(t.key)} style={chipStyle(tab === t.key, C.ink)}>
+                  <button key={t.key} onClick={() => onTab(t.key)} style={chipStyle(tab === t.key, C.ink)}>
                     {t.label}
                   </button>
                 ))}
@@ -270,11 +272,24 @@ interface LeagueTabProps {
   venueId: string;
   member: Member | null;
   isAdmin: boolean;
+  /** The open event and its inner tab come from the URL. */
+  leagueId: string | null;
+  leagueTab: DetailTab;
+  onOpenLeague: (leagueId: string | null) => void;
+  onLeagueTab: (tab: DetailTab) => void;
   onOpenAuth: () => void;
 }
 
-export function LeagueTab({ venueId, member, isAdmin, onOpenAuth }: LeagueTabProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export function LeagueTab({
+  venueId,
+  member,
+  isAdmin,
+  leagueId: selectedId,
+  leagueTab,
+  onOpenLeague,
+  onLeagueTab,
+  onOpenAuth,
+}: LeagueTabProps) {
   const [creating, setCreating] = useState(false);
   const events = useLeagues(venueId, member?.id ?? null);
 
@@ -282,9 +297,11 @@ export function LeagueTab({ venueId, member, isAdmin, onOpenAuth }: LeagueTabPro
     return (
       <LeagueDetail
         leagueId={selectedId}
+        tab={leagueTab}
+        onTab={onLeagueTab}
         member={member}
         isAdmin={isAdmin}
-        onBack={() => setSelectedId(null)}
+        onBack={() => onOpenLeague(null)}
         onDelete={() => events.deleteLeague(selectedId)}
         onOpenAuth={onOpenAuth}
       />
@@ -301,13 +318,13 @@ export function LeagueTab({ venueId, member, isAdmin, onOpenAuth }: LeagueTabPro
     const id = await events.createLeague(input);
     if (!id) return;
     setCreating(false);
-    setSelectedId(id);
+    onOpenLeague(id);
   };
 
   const list = (items: LeagueSummary[]) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
       {items.map((l) => (
-        <LeagueRow key={l.id} league={l} onClick={() => setSelectedId(l.id)} />
+        <LeagueRow key={l.id} league={l} onClick={() => onOpenLeague(l.id)} />
       ))}
     </div>
   );

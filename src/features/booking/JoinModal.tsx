@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Trash2, UserPlus } from "lucide-react";
+import { Link2, Trash2, UserPlus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { chipStyle } from "@/components/ui/chipStyle";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -12,6 +12,42 @@ import type { Booking, BookingKind, Member, Participant, Venue, Visibility } fro
 import { C, FONT } from "@/styles/tokens";
 import { CHANGE_CUTOFF_HOURS, KINDS, changesOpen, kindOf } from "./constants";
 import { addHours, hoursBetween, toInstant, zonedDate, zonedTime, type Slot } from "./slots";
+
+/* Copies the page URL, which names this booking, for sharing. */
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        marginTop: 12,
+        padding: "5px 10px",
+        borderRadius: 999,
+        border: "1px solid rgba(0,0,0,0.15)",
+        background: "transparent",
+        color: copied ? C.turf : "rgba(27,36,34,0.6)",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      <Link2 size={13} />
+      {copied ? "링크 복사됨" : "링크 복사"}
+    </button>
+  );
+}
 
 const VISIBILITIES: { key: Visibility; label: string; hint: string }[] = [
   { key: "public", label: "공개", hint: "누구나 참여할 수 있어요" },
@@ -209,6 +245,7 @@ export function JoinModal({
       }
       onClose={onClose}
     >
+      {booking && <CopyLinkButton />}
       {!member && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 13, color: "rgba(27,36,34,0.6)" }}>

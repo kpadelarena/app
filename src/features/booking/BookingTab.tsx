@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { SectionCard } from "@/components/ui/SectionCard";
 import type { BookingPatch, NewBooking, Who } from "@/lib/db";
@@ -6,7 +6,7 @@ import type { Booking, Member, Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { DAYS_AHEAD, KINDS, kindOf } from "./constants";
 import { JoinModal } from "./JoinModal";
-import { addHours, hoursBetween, nextDays, toInstant, type Slot } from "./slots";
+import { addHours, hoursBetween, nextDays, type Slot, toInstant, zonedDate, zonedTime } from "./slots";
 
 function CourtHeaderCell({ name }: { name: string }) {
   return (
@@ -122,6 +122,15 @@ interface BookingTabProps {
   onLeave: (participantId: string) => void;
   onUpdate: (bookingId: string, patch: BookingPatch) => void;
   onDelete: (bookingId: string) => void;
+  /** The day from the URL (YYYY-MM-DD), null for today. */
+  date: string | null;
+  /** null means today; days outside the window are reported as null too. */
+  onSelectDate: (date: string | null) => void;
+  /** The booking whose sheet the URL says is open, if any. */
+  bookingId: string | null;
+  bookingsLoading: boolean;
+  /** Puts a booking in (or takes it out of) the URL, always with its day. */
+  onOpenBooking: (bookingId: string | null, date: string) => void;
   onOpenAuth: () => void;
 }
 
@@ -136,15 +145,44 @@ export function BookingTab({
   onLeave,
   onUpdate,
   onDelete,
+  date: requestedDate,
+  onSelectDate,
+  bookingId,
+  bookingsLoading,
+  onOpenBooking,
   onOpenAuth,
 }: BookingTabProps) {
   const days = useMemo(() => nextDays(DAYS_AHEAD, venue.timezone), [venue.timezone]);
   const hours = useMemo(() => hoursBetween(venue.openTime, venue.closeTime), [venue.openTime, venue.closeTime]);
-  const [selectedDate, setSelectedDate] = useState(days[0].iso);
-  const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
-  const date = days.some((d) => d.iso === selectedDate) ? selectedDate : days[0].iso;
+  const [localSlot, setLocalSlot] = useState<Slot | null>(null);
+  const inWindow = !!requestedDate && days.some((d) => d.iso === requestedDate);
+  const date = inWindow ? requestedDate : days[0].iso;
+
+  // A stale or malformed day in the URL falls back to today, and the URL follows.
+  useEffect(() => {
+    if (requestedDate && !inWindow) onSelectDate(null);
+  }, [requestedDate, inWindow, onSelectDate]);
 
   const slotStart = (slot: Slot) => toInstant(slot.date, slot.time, venue.timezone);
+  const slotOf = (b: Booking): Slot => ({
+    date: zonedDate(new Date(b.startsAt), venue.timezone),
+    time: zonedTime(new Date(b.startsAt), venue.timezone),
+    courtId: b.courtId,
+  });
+
+  // The open sheet: the booking named in the URL, or a cell the user tapped.
+  const linked = bookingId ? bookings.find((b) => b.id === bookingId) : undefined;
+  const activeSlot = linked ? slotOf(linked) : bookingId ? null : localSlot;
+  const missingBooking = !!bookingId && !linked && !bookingsLoading;
+  const openSlot = (slot: Slot) => {
+    const booked = bookingAt(slot);
+    if (booked) onOpenBooking(booked.id, slot.date);
+    else setLocalSlot(slot);
+  };
+  const closeSheet = () => {
+    setLocalSlot(null);
+    if (bookingId) onOpenBooking(null, date);
+  };
   const bookingAt = (slot: Slot) => {
     const at = slotStart(slot).getTime();
     return bookings.find(
@@ -165,13 +203,27 @@ export function BookingTab({
 
   return (
     <>
+      {missingBooking && (
+        <div
+          style={{
+            fontSize: 12,
+            color: C.danger,
+            background: "rgba(194,84,80,0.08)",
+            border: `1px solid ${C.danger}`,
+            borderRadius: 10,
+            padding: "8px 12px",
+          }}
+        >
+          링크의 예약을 찾을 수 없어요. 취소됐거나 지난 예약이에요.
+        </div>
+      )}
       <SectionCard>
         <Eyebrow>날짜선택</Eyebrow>
         <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
           {days.map((d) => (
             <button
               key={d.iso}
-              onClick={() => setSelectedDate(d.iso)}
+              onClick={() => onSelectDate(d.iso === days[0].iso ? null : d.iso)}
               style={{
                 flex: "0 0 auto",
                 display: "flex",
@@ -245,7 +297,7 @@ export function BookingTab({
                         past={slotStart(slot).getTime() < Date.now()}
                         maxPlayers={venue.maxPlayers}
                         showCount={!!member}
-                        onClick={() => setActiveSlot(slot)}
+                        onClick={() => openSlot(slot)}
                       />
                     );
                   })}
@@ -280,16 +332,16 @@ export function BookingTab({
             if (!activeBooking) return;
             onUpdate(activeBooking.id, patch);
             // A moved booking no longer belongs to the open cell.
-            if (patch.startsAt) setActiveSlot(null);
+            if (patch.startsAt) closeSheet();
           }}
           onDelete={() => {
             if (activeBooking) {
               onDelete(activeBooking.id);
-              setActiveSlot(null);
+              closeSheet();
             }
           }}
           onOpenAuth={onOpenAuth}
-          onClose={() => setActiveSlot(null)}
+          onClose={closeSheet}
         />
       )}
     </>
