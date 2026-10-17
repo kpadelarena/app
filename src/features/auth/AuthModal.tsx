@@ -264,6 +264,17 @@ export function AuthModal({
           >
             {busy ? "가입 중..." : "가입하기"}
           </PrimaryButton>
+          <div style={{ fontSize: 11, color: "rgba(27,36,34,0.5)" }}>
+            가입하면{" "}
+            <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
+              이용약관
+            </a>
+            과{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
+              개인정보처리방침
+            </a>
+            에 동의하는 것으로 봐요.
+          </div>
           <button onClick={() => setMode("login")} style={{ ...linkButtonStyle, color: "rgba(27,36,34,0.5)" }}>
             이미 계정이 있어요
           </button>
