@@ -1,5 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
+import type { ProfileRow } from "./types";
 
 /*
  * The sign-up form asks for a username + password, not an email — but
@@ -116,7 +117,7 @@ export async function getCurrentAuthUser() {
   return user;
 }
 
-export async function getCurrentProfile() {
+export async function getCurrentProfile(): Promise<ProfileRow | null> {
   const user = await getCurrentAuthUser();
   if (!user) return null;
   const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();

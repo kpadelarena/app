@@ -4,21 +4,55 @@
 지원하는 Next.js 앱입니다. 데이터는 Supabase(Postgres + Auth + Storage)에
 저장되어 모든 방문자가 같은 데이터를 봅니다.
 
-## 설정
+## 로컬 개발
+
+Node 24, [pnpm](https://pnpm.io)(`corepack enable`), Docker가 필요합니다.
+
+```
+pnpm install
+pnpm db:start                      # 로컬 Supabase 실행 + 마이그레이션·시드 적용
+cp .env.local.example .env.local   # 로컬 Supabase 주소와 키가 들어 있음
+pnpm dev
+```
+
+http://localhost:3000 에서 확인. 개발용 로그인 계정은
+[`supabase/seed.sql`](./supabase/seed.sql) 맨 위에 적혀 있습니다.
+
+| 명령             | 설명                                                  |
+| ---------------- | ----------------------------------------------------- |
+| `pnpm db:reset`  | 로컬 DB를 비우고 마이그레이션과 시드를 다시 적용      |
+| `pnpm db:types`  | DB 스키마에서 `src/lib/database.types.ts`를 다시 생성 |
+| `pnpm db:stop`   | 로컬 Supabase 중지                                    |
+| `pnpm typecheck` | 타입 검사                                             |
+| `pnpm lint`      | ESLint                                                |
+| `pnpm format`    | Prettier로 코드 정리                                  |
+
+로컬 Supabase Studio(테이블 보기·SQL 실행)는 http://127.0.0.1:54323 입니다.
+
+### 스키마 변경
+
+1. `pnpm supabase migration new <이름>` 으로 `supabase/migrations/`에 새 파일을
+   만들고 SQL을 작성합니다.
+2. `pnpm db:reset` 으로 로컬 DB에 처음부터 다시 적용해 확인합니다.
+3. `pnpm db:types` 로 타입을 다시 생성해 함께 커밋합니다.
+
+## 배포 설정
 
 ### 1. Supabase 프로젝트 만들기
 
 [supabase.com](https://supabase.com) → **New project** → 이름, 비밀번호,
 리전(서울 `ap-northeast-2` 추천) 설정.
 
-### 2. SQL 파일 3개를 순서대로 실행
+### 2. 마이그레이션 적용
 
-**SQL Editor**에서 각 파일의 전체 내용을 붙여넣고 **Run**. 반드시 이
-순서로 실행하세요. 여러 번 실행해도 안전합니다.
+```
+pnpm supabase login
+pnpm supabase link --project-ref <프로젝트 ref>
+pnpm supabase db push
+```
 
-1. `supabase/001_schema.sql` — 테이블 생성
-2. `supabase/002_rls_policies.sql` — 보안 정책(RLS)
-3. `supabase/003_storage_buckets.sql` — 사진 저장용 Storage 버킷 4개
+`supabase/migrations/`의 SQL(테이블, 보안 정책(RLS), 사진 저장용 Storage
+버킷)이 순서대로 적용됩니다. 시드 데이터는 적용되지 않습니다.
 
 ### 3. 이메일 인증 끄기
 
@@ -43,21 +77,8 @@ Auth에 가입됩니다. 실제 이메일이 아니므로 이메일 인증을 �
 호스팅 서비스의 환경변수 설정에 두 값을 추가한 뒤 배포하세요. 빌드할 때
 앱에 포함되는 값이라, 없으면 빌드가 실패합니다.
 
-(anon key는 브라우저에 노출돼도 안전합니다 — 실제 접근 제어는 2단계의
-RLS 정책이 담당합니다.)
-
-## 로컬 개발
-
-Node 24와 [pnpm](https://pnpm.io)이 필요합니다 (`corepack enable`로 pnpm을
-켤 수 있습니다).
-
-```
-pnpm install
-cp .env.local.example .env.local   # Supabase URL/anon key 입력
-pnpm dev
-```
-
-http://localhost:3000 에서 확인.
+(anon key는 브라우저에 노출돼도 안전합니다 — 실제 접근 제어는 RLS 정책이
+담당합니다.)
 
 ## 알려진 제한사항
 
