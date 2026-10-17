@@ -107,3 +107,18 @@ test("the owner can add a venue with a court and delete it again", async ({ page
   await page.getByRole("button", { name: "지점 삭제" }).click();
   await expect(page.getByRole("combobox").first()).not.toContainText(name);
 });
+
+test("the owner can change a member's role and change it back", async ({ page }) => {
+  await logIn(page, OWNER);
+  await page.getByRole("button", { name: "회원", exact: true }).click();
+
+  const role = page.getByLabel("이서연 역할");
+  await expect(role).toHaveValue("member");
+  await role.selectOption("admin");
+  await page.reload();
+  await page.getByRole("button", { name: "회원", exact: true }).click();
+  await expect(page.getByLabel("이서연 역할")).toHaveValue("admin");
+
+  await page.getByLabel("이서연 역할").selectOption("member");
+  await expect(page.getByLabel("이서연 역할")).toHaveValue("member");
+});

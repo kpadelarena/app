@@ -4,6 +4,7 @@ import type {
   Amenities,
   Booking,
   BookingKind,
+  Contact,
   League,
   LeagueFormat,
   LeagueSummary,
@@ -11,6 +12,7 @@ import type {
   Member,
   MyBooking,
   MyMatch,
+  Role,
   Round,
   Team,
   Venue,
@@ -88,6 +90,17 @@ export async function uploadAvatar(profileId: string, file: File) {
 export const setAvatarUrl = (profileId: string, url: string) => updateProfile(profileId, { photo_url: url });
 
 export const updateProfileLevel = (profileId: string, level: number) => updateProfile(profileId, { level });
+
+/* Owners only; the database also keeps the last owner in place. */
+export const updateMemberRole = (profileId: string, role: Role) => updateProfile(profileId, { role });
+
+/* Contact details by member id. Row-level security returns only the
+   caller's own row unless they are an admin. */
+export async function getContacts(): Promise<Record<string, Contact>> {
+  const { data, error } = await supabase.from("profile_contacts").select("id, email, phone");
+  if (error) throw error;
+  return Object.fromEntries(data.map((c) => [c.id, { email: c.email, phone: c.phone }]));
+}
 
 /* =====================================================================
    Venues and courts
