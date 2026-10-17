@@ -88,6 +88,15 @@ Project Settings, API Keys, API Key Secrets (모두 Read). 마이그레이션은
 Supabase 기본 메일 발송은 시간당 몇 통으로 제한되므로, 가입이 많아지면
 Resend 같은 SMTP를 **Project Settings → Auth → SMTP**에 연결하세요.
 
+### 3-1. Google 로그인
+
+Supabase Dashboard → Authentication → Providers → Google에 Google Cloud에서 만든
+OAuth 클라이언트의 Client ID와 Secret을 넣으면 앱의 "Google로 계속하기" 버튼이
+동작합니다. Google 쪽 Authorized redirect URI는
+`https://<project-ref>.supabase.co/auth/v1/callback` 입니다. 코드에는 아무것도
+들어가지 않습니다. 로컬 스택에는 Google이 설정돼 있지 않아 로컬에서는 이
+버튼이 오류 페이지로 이동합니다.
+
 ### 4. Vercel 환경변수
 
 Vercel 프로젝트(Production, Preview 모두)에 두 값을 넣습니다. 빌드할 때 앱에

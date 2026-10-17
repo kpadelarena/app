@@ -41,6 +41,7 @@ export function ClubApp() {
       member={session.member}
       contact={session.contact}
       onLogIn={session.logIn}
+      onGoogle={session.logInWithGoogle}
       onLogout={session.logOut}
       onSignUp={session.signUp}
       onUploadProfilePhoto={session.updatePhoto}
