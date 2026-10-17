@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // rather than letting a site with no backend get deployed.
   throw new Error(
     "[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. " +
-      "Set them in .env.local (dev) or your host's environment variables (production), then rebuild."
+      "Set them in .env.local (dev) or your host's environment variables (production), then rebuild.",
   );
 }
 

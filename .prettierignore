@@ -1,0 +1,5 @@
+.next
+pnpm-lock.yaml
+
+# Not formatted until it has been split into typed components.
+src/PadelLeagueApp.jsx

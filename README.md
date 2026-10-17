@@ -35,9 +35,9 @@ Auth에 가입됩니다. 실제 이메일이 아니므로 이메일 인증을 �
 
 **Project Settings → API**에서 두 값을 복사합니다.
 
-| Key | Value |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| Key                             | Value           |
+| ------------------------------- | --------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Project URL     |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
 
 호스팅 서비스의 환경변수 설정에 두 값을 추가한 뒤 배포하세요. 빌드할 때

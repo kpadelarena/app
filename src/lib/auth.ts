@@ -1,3 +1,4 @@
+import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 
 /*
@@ -27,7 +28,23 @@ import { supabase } from "./supabaseClient";
 
 const AUTH_EMAIL_DOMAIN = "padelconnect.invalid";
 
-function usernameToAuthEmail(username) {
+export interface SignUpInput {
+  username: string;
+  password: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  gender?: string;
+  region?: string;
+  level: number;
+  photoUrl?: string | null;
+}
+
+export type AuthResult =
+  | { user: User; session: Session | null; error?: undefined }
+  | { error: { message: string }; user?: undefined; session?: undefined };
+
+function usernameToAuthEmail(username: string) {
   return `${username.trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
 }
 
@@ -41,7 +58,7 @@ export async function signUpWithUsername({
   region,
   level,
   photoUrl,
-}) {
+}: SignUpInput): Promise<AuthResult> {
   const normalizedUsername = username.trim().toLowerCase();
 
   const { data: existing } = await supabase
@@ -75,7 +92,7 @@ export async function signUpWithUsername({
   return { user, session: data.session };
 }
 
-export async function signInWithUsername(username, password) {
+export async function signInWithUsername(username: string, password: string): Promise<AuthResult> {
   const authEmail = usernameToAuthEmail(username);
   const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password });
   if (error) return { error: { message: "invalid_credentials" } };
@@ -87,7 +104,7 @@ export async function signOut() {
 }
 
 /* Self-service password change while signed in — no email required. */
-export async function changePassword(newPassword) {
+export async function changePassword(newPassword: string) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   return { error };
 }
