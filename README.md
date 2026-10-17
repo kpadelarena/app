@@ -58,7 +58,8 @@ http://localhost:3000 에서 확인. 개발용 로그인 계정은
 
 - PR에서 `supabase/`가 바뀌면 로컬 DB를 띄워 `supabase/tests/`의 테스트를 실행합니다.
 - `main`에 머지되면 `supabase db push`로 운영 프로젝트에 새 마이그레이션을 적용합니다.
-  시드 데이터는 적용되지 않습니다. 운영 데이터(지점, 코트, 첫 관리자)는 직접 넣습니다.
+  시드 데이터는 적용되지 않습니다. 지점과 코트는 첫 관리자가 앱에서 등록합니다
+  (코트 예약 탭 → 지점 설정).
 
 저장소 Secrets(Settings → Secrets and variables → Actions)에 세 값이 필요합니다:
 
