@@ -8,7 +8,7 @@ import { AccountButton } from "@/features/auth/AccountButton";
 import { AuthModal } from "@/features/auth/AuthModal";
 import { useSession } from "@/features/auth/useSession";
 import { BookingTab } from "@/features/booking/BookingTab";
-import { LeaguePlaceholder } from "@/features/league/LeaguePlaceholder";
+import { LeagueTab } from "@/features/league/LeagueTab";
 import { MyScheduleTab } from "@/features/league/MyScheduleTab";
 import { C, FONT } from "@/styles/tokens";
 import { ClubHeader } from "./ClubHeader";
@@ -111,7 +111,15 @@ export function ClubApp() {
           />
         )}
 
-        {tab === "league" && <LeaguePlaceholder />}
+        {tab === "league" && (
+          <LeagueTab
+            key={venue.id}
+            venueId={venue.id}
+            member={session.member}
+            isAdmin={session.isAdmin}
+            onOpenAuth={openAuth}
+          />
+        )}
 
         {club.saveError && (
           <div style={{ marginTop: 24, textAlign: "center", fontSize: 12, color: C.danger }}>

@@ -25,11 +25,10 @@ export function useSession() {
   const member = sessionQuery.data?.member ?? null;
   const contact = sessionQuery.data?.contact ?? null;
 
-  // Anything that depends on who is signed in is re-read on sign-in/out,
-  // including bookings: participants are only visible to members.
+  // Everything else is re-read on sign-in/out: what a visitor may see
+  // depends on who they are (booking participants, league rosters, ...).
   const invalidateMemberData = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.myBookings.all });
+    void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== queryKeys.session[0] });
   }, [queryClient]);
 
   useEffect(() => {

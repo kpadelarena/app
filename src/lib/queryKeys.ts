@@ -12,4 +12,16 @@ export const queryKeys = {
     all: ["myBookings"] as const,
     forMember: (memberId: string) => ["myBookings", memberId] as const,
   },
+  leagues: {
+    all: ["leagues"] as const,
+    forVenue: (venueId: string) => ["leagues", venueId] as const,
+  },
+  league: {
+    all: ["league"] as const,
+    detail: (leagueId: string) => ["league", leagueId] as const,
+  },
+  myMatches: {
+    all: ["myMatches"] as const,
+    forMember: (memberId: string) => ["myMatches", memberId] as const,
+  },
 };

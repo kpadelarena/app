@@ -78,13 +78,26 @@ export interface MyBooking {
   venueName: string;
 }
 
-/* League events — the in-memory shape the league screens render. Wired
-   to the database in a later PR. */
+/* League events */
 
+/** A row in the event list. */
+export interface LeagueSummary {
+  id: string;
+  venueId: string;
+  name: string;
+  format: LeagueFormat;
+  /** YYYY-MM-DD */
+  eventDate: string;
+  courtCount: number;
+  playerCount: number;
+}
+
+/** A roster entry: a member or a named guest. Its id is what match sides refer to. */
 export interface Player {
   id: string;
   name: string;
-  isGuest?: boolean;
+  isGuest: boolean;
+  profileId: string | null;
 }
 
 export interface Match {
@@ -110,8 +123,10 @@ export interface Team {
   playerIds: string[];
 }
 
+/** One event with everything the league screens need. */
 export interface League {
   id: string;
+  venueId: string;
   name: string;
   format: LeagueFormat;
   eventDate: string;
@@ -120,4 +135,17 @@ export interface League {
   players: Player[];
   teams: Team[];
   rounds: Round[];
+}
+
+/** One of the signed-in member's matches, across events. */
+export interface MyMatch {
+  id: string;
+  leagueName: string;
+  eventDate: string;
+  venueName: string;
+  roundNumber: number;
+  court: number;
+  opponents: string[];
+  scoreA: string;
+  scoreB: string;
 }

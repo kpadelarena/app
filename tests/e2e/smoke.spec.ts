@@ -39,6 +39,7 @@ test("the owner can book a free court slot and see it in their schedule", async 
   // The slot now shows as partly booked (1 of 6), and still does after a reload.
   await expect(freeSlots).toHaveCount(before - 1);
   await page.reload();
+  await pickLastDay(page);
   await expect(page.getByRole("button", { name: /5자리 남음/ }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "내 일정" }).click();
@@ -54,4 +55,36 @@ test("the owner can book a free court slot and see it in their schedule", async 
     .click();
   await page.getByRole("button", { name: "예약 삭제" }).click();
   await expect(freeSlots).toHaveCount(before);
+});
+
+test("the owner can run a league event: create, add players, generate a schedule, delete", async ({ page }) => {
+  await logIn(page, OWNER);
+  await page.getByRole("button", { name: "리그" }).click();
+
+  const name = `E2E 리그 ${Date.now()}`;
+  await page.getByRole("button", { name: "새 이벤트" }).click();
+  await page.getByPlaceholder("이벤트 이름", { exact: false }).fill(name);
+  await page.getByRole("button", { name: "이벤트 만들기" }).click();
+  await expect(page.getByText(name)).toBeVisible();
+
+  for (const guest of ["게스트 A", "게스트 B", "게스트 C", "게스트 D"]) {
+    await page.getByPlaceholder("게스트 이름").fill(guest);
+    await page.getByRole("button", { name: "게스트", exact: true }).click();
+    await expect(page.getByText(guest)).toBeVisible();
+  }
+  await expect(page.getByText("총 4명 등록됨")).toBeVisible();
+
+  await page.getByRole("button", { name: "대진표", exact: true }).click();
+  await page.getByRole("button", { name: "대진표 생성" }).click();
+  await expect(page.getByText("ROUND 1")).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "리그" }).click();
+  await page.getByRole("button", { name: name }).click();
+  await page.getByRole("button", { name: "대진표", exact: true }).click();
+  await expect(page.getByText("ROUND 1")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "이벤트 삭제" }).click();
+  await expect(page.getByText("리그 이벤트", { exact: true })).toBeVisible();
+  await expect(page.getByText(name)).toHaveCount(0);
 });

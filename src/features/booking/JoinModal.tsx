@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { chipStyle } from "@/components/ui/chipStyle";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -16,18 +17,6 @@ const VISIBILITIES: { key: Visibility; label: string; hint: string }[] = [
   { key: "public", label: "공개", hint: "누구나 참여할 수 있어요" },
   { key: "private", label: "비공개", hint: "참여자가 초대한 사람만" },
 ];
-
-const chipStyle = (active: boolean, color: string) =>
-  ({
-    padding: "6px 12px",
-    borderRadius: 999,
-    border: `1px solid ${active ? color : "rgba(0,0,0,0.15)"}`,
-    background: active ? color : "transparent",
-    color: active ? "#fff" : C.charcoal,
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-  }) as const;
 
 interface JoinModalProps {
   venue: Venue;

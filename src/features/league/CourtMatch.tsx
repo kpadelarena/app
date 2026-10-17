@@ -6,9 +6,10 @@ interface ScoreInputProps {
   value: string;
   onChange: (value: string) => void;
   highlight: boolean;
+  readOnly: boolean;
 }
 
-function ScoreInput({ value, onChange, highlight }: ScoreInputProps) {
+function ScoreInput({ value, onChange, highlight, readOnly }: ScoreInputProps) {
   return (
     <input
       type="number"
@@ -16,6 +17,7 @@ function ScoreInput({ value, onChange, highlight }: ScoreInputProps) {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="-"
+      disabled={readOnly}
       style={{
         width: 48,
         height: 40,
@@ -28,6 +30,7 @@ function ScoreInput({ value, onChange, highlight }: ScoreInputProps) {
         fontWeight: 700,
         fontSize: 17,
         outline: "none",
+        opacity: 1,
       }}
     />
   );
@@ -37,12 +40,14 @@ interface CourtMatchProps {
   match: Match;
   nameOf: (id: string) => string;
   onScore: (field: "scoreA" | "scoreB", value: string) => void;
+  /** Only the players in the match and admins enter scores. */
+  readOnly?: boolean;
 }
 
 /* ---------------------------------------------------------
    코트 다이어그램 매치 카드 — 시그니처 요소
 --------------------------------------------------------- */
-export function CourtMatch({ match, nameOf, onScore }: CourtMatchProps) {
+export function CourtMatch({ match, nameOf, onScore, readOnly = false }: CourtMatchProps) {
   const score = matchScore(match);
   const aWins = !!score && score[0] > score[1];
   const bWins = !!score && score[1] > score[0];
@@ -133,9 +138,9 @@ export function CourtMatch({ match, nameOf, onScore }: CourtMatchProps) {
           padding: "10px 12px 14px",
         }}
       >
-        <ScoreInput value={match.scoreA} onChange={(v) => onScore("scoreA", v)} highlight={aWins} />
+        <ScoreInput value={match.scoreA} onChange={(v) => onScore("scoreA", v)} highlight={aWins} readOnly={readOnly} />
         <span style={{ color: "rgba(255,255,255,0.4)", fontFamily: FONT.mono }}>:</span>
-        <ScoreInput value={match.scoreB} onChange={(v) => onScore("scoreB", v)} highlight={bWins} />
+        <ScoreInput value={match.scoreB} onChange={(v) => onScore("scoreB", v)} highlight={bWins} readOnly={readOnly} />
       </div>
     </div>
   );

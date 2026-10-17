@@ -6,10 +6,11 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { changesOpen, kindOf } from "@/features/booking/constants";
 import { zonedDate } from "@/features/booking/slots";
-import { getMyBookings } from "@/lib/db";
+import { getMyBookings, getMyMatches } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
 import type { Member } from "@/lib/types";
-import { C } from "@/styles/tokens";
+import { C, FONT } from "@/styles/tokens";
+import { formatEventDate, todayDate } from "./eventDate";
 
 const rowStyle: CSSProperties = {
   display: "flex",
@@ -39,6 +40,11 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
   const { data: bookings } = useQuery({
     queryKey: queryKeys.myBookings.forMember(member?.id ?? ""),
     queryFn: () => getMyBookings(member!.id, new Date()),
+    enabled: !!member,
+  });
+  const { data: matches } = useQuery({
+    queryKey: queryKeys.myMatches.forMember(member?.id ?? ""),
+    queryFn: () => getMyMatches(member!.id, todayDate()),
     enabled: !!member,
   });
 
@@ -111,8 +117,30 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
       </SectionCard>
 
       <SectionCard>
-        <Eyebrow>내 경기 일정</Eyebrow>
-        <EmptyHint text="리그 경기 일정은 다음 업데이트에서 돌아와요." />
+        <Eyebrow>내 리그 경기</Eyebrow>
+        {!matches ? null : matches.length === 0 ? (
+          <EmptyHint text="예정된 리그 경기가 없어요. 대진표가 만들어지면 여기에 표시돼요." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+            {matches.map((m) => (
+              <div key={m.id} style={rowStyle}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {formatEventDate(m.eventDate)} · {m.leagueName}
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
+                    {m.venueName} · {m.roundNumber}라운드 · 코트 {m.court} · vs {m.opponents.join(", ")}
+                  </div>
+                </div>
+                {m.scoreA !== "" && m.scoreB !== "" && (
+                  <span style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 15 }}>
+                    {m.scoreA}:{m.scoreB}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </SectionCard>
     </div>
   );

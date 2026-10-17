@@ -1,6 +1,21 @@
 import type { Tables, TablesUpdate } from "./database.types";
 import { supabase } from "./supabaseClient";
-import type { Amenities, Booking, BookingKind, Member, MyBooking, Venue, Visibility } from "./types";
+import type {
+  Amenities,
+  Booking,
+  BookingKind,
+  League,
+  LeagueFormat,
+  LeagueSummary,
+  Match,
+  Member,
+  MyBooking,
+  MyMatch,
+  Round,
+  Team,
+  Venue,
+  Visibility,
+} from "./types";
 
 /* =====================================================================
    Image helpers — resize in the browser before upload so a phone photo
@@ -258,11 +273,259 @@ export async function getMyBookings(profileId: string, from: Date): Promise<MyBo
 }
 
 /* =====================================================================
-   Realtime — reload whenever bookings or venues change anywhere.
+   League events
+   ===================================================================== */
+export async function getLeagues(venueId: string): Promise<LeagueSummary[]> {
+  const { data, error } = await supabase
+    .from("leagues")
+    .select("*, league_players(count)")
+    .eq("venue_id", venueId)
+    .order("event_date", { ascending: false });
+  if (error) throw error;
+  return data.map((row) => ({
+    id: row.id,
+    venueId: row.venue_id,
+    name: row.name,
+    format: row.format,
+    eventDate: row.event_date,
+    courtCount: row.court_count,
+    playerCount: row.league_players[0]?.count ?? 0,
+  }));
+}
+
+export interface NewLeague {
+  venueId: string;
+  name: string;
+  format: LeagueFormat;
+  eventDate: string;
+  courtCount: number;
+}
+
+/* Admins only. Resolves to the new event's id. */
+export async function createLeague({ venueId, name, format, eventDate, courtCount }: NewLeague, createdBy: string) {
+  const { data, error } = await supabase
+    .from("leagues")
+    .insert({ venue_id: venueId, name, format, event_date: eventDate, court_count: courtCount, created_by: createdBy })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export interface LeaguePatch {
+  name?: string;
+  format?: LeagueFormat;
+  eventDate?: string;
+  courtCount?: number;
+  resultPhotoUrl?: string;
+}
+
+export async function updateLeague(leagueId: string, patch: LeaguePatch) {
+  const row: TablesUpdate<"leagues"> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.format !== undefined) row.format = patch.format;
+  if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
+  if (patch.courtCount !== undefined) row.court_count = patch.courtCount;
+  if (patch.resultPhotoUrl !== undefined) row.result_photo_url = patch.resultPhotoUrl;
+  const { error } = await supabase.from("leagues").update(row).eq("id", leagueId);
+  if (error) throw error;
+}
+
+/* Roster, teams and matches go with it. */
+export async function deleteLeague(leagueId: string) {
+  const { error } = await supabase.from("leagues").delete().eq("id", leagueId);
+  if (error) throw error;
+}
+
+const toMatch = (row: Tables<"matches">): Match => ({
+  id: row.id,
+  court: row.court_number,
+  sideA: row.side_a,
+  sideB: row.side_b,
+  scoreA: row.score_a === null ? "" : String(row.score_a),
+  scoreB: row.score_b === null ? "" : String(row.score_b),
+});
+
+/* Groups flat match rows into rounds, in order. */
+function toRounds(rows: Tables<"matches">[]): Round[] {
+  const byRound = new Map<number, Round>();
+  for (const row of [...rows].sort((a, b) => a.round_number - b.round_number || a.court_number - b.court_number)) {
+    let round = byRound.get(row.round_number);
+    if (!round) {
+      round = { roundNumber: row.round_number, matches: [], sitOut: row.sit_out };
+      byRound.set(row.round_number, round);
+    }
+    round.matches.push(toMatch(row));
+  }
+  return [...byRound.values()];
+}
+
+const LEAGUE_COLUMNS =
+  "*, league_players(id, profile_id, guest_name, created_at, profiles(display_name)), league_teams(*), matches(*)";
+
+/* The event with its roster, teams and matches. Roster and matches are
+   empty for logged-out visitors, who may not read them. */
+export async function getLeague(leagueId: string): Promise<League | null> {
+  const { data, error } = await supabase.from("leagues").select(LEAGUE_COLUMNS).eq("id", leagueId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    id: data.id,
+    venueId: data.venue_id,
+    name: data.name,
+    format: data.format,
+    eventDate: data.event_date,
+    courtCount: data.court_count,
+    resultPhoto: data.result_photo_url,
+    players: [...data.league_players]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((p) => ({
+        id: p.id,
+        name: p.profiles?.display_name || p.guest_name || "?",
+        isGuest: !p.profile_id,
+        profileId: p.profile_id,
+      })),
+    teams: data.league_teams.map((t) => ({ id: t.id, name: t.name, playerIds: t.player_ids })),
+    rounds: toRounds(data.matches),
+  };
+}
+
+export async function addLeaguePlayer(leagueId: string, who: Who) {
+  const { error } = await supabase.from("league_players").insert({
+    league_id: leagueId,
+    profile_id: "profileId" in who ? who.profileId : null,
+    guest_name: "guestName" in who ? who.guestName : null,
+  });
+  if (error) throw error;
+}
+
+export async function removeLeaguePlayer(leaguePlayerId: string) {
+  const { error } = await supabase.from("league_players").delete().eq("id", leaguePlayerId);
+  if (error) throw error;
+}
+
+/* Replaces the round-robin teams. Existing matches refer to the old
+   team ids, so they are cleared too. */
+export async function setLeagueTeams(leagueId: string, teams: Pick<Team, "name" | "playerIds">[]) {
+  await clearMatches(leagueId);
+  const { error: delErr } = await supabase.from("league_teams").delete().eq("league_id", leagueId);
+  if (delErr) throw delErr;
+  if (teams.length === 0) return;
+  const { error } = await supabase
+    .from("league_teams")
+    .insert(teams.map((t) => ({ league_id: leagueId, name: t.name, player_ids: t.playerIds })));
+  if (error) throw error;
+}
+
+const scoreToColumn = (score: string) => (score === "" ? null : Number(score));
+
+const toMatchRows = (leagueId: string, round: Round) =>
+  round.matches.map((m) => ({
+    league_id: leagueId,
+    round_number: round.roundNumber,
+    court_number: m.court,
+    side_a: m.sideA,
+    side_b: m.sideB,
+    score_a: scoreToColumn(m.scoreA),
+    score_b: scoreToColumn(m.scoreB),
+    sit_out: round.sitOut ?? [],
+  }));
+
+/* Replaces the whole schedule. */
+export async function replaceMatches(leagueId: string, rounds: Round[]) {
+  await clearMatches(leagueId);
+  if (rounds.length === 0) return;
+  const { error } = await supabase.from("matches").insert(rounds.flatMap((r) => toMatchRows(leagueId, r)));
+  if (error) throw error;
+}
+
+/* Appends one round (Mexicano). */
+export async function appendMatches(leagueId: string, round: Round) {
+  const { error } = await supabase.from("matches").insert(toMatchRows(leagueId, round));
+  if (error) throw error;
+}
+
+export async function removeRound(leagueId: string, roundNumber: number) {
+  const { error } = await supabase.from("matches").delete().eq("league_id", leagueId).eq("round_number", roundNumber);
+  if (error) throw error;
+}
+
+export async function clearMatches(leagueId: string) {
+  const { error } = await supabase.from("matches").delete().eq("league_id", leagueId);
+  if (error) throw error;
+}
+
+/* Players in the match and admins may do this (row-level security). */
+export async function updateMatchScore(matchId: string, field: "scoreA" | "scoreB", value: string) {
+  const score = scoreToColumn(value);
+  const { error } = await supabase
+    .from("matches")
+    .update(field === "scoreA" ? { score_a: score } : { score_b: score })
+    .eq("id", matchId);
+  if (error) throw error;
+}
+
+export async function uploadResultPhoto(leagueId: string, file: File) {
+  const url = await uploadPhoto("result-photos", `${leagueId}/result-${Date.now()}.jpg`, file, 1400);
+  await updateLeague(leagueId, { resultPhotoUrl: url });
+  return url;
+}
+
+/* The signed-in member's matches in upcoming events, at any venue. */
+export async function getMyMatches(profileId: string, fromDate: string): Promise<MyMatch[]> {
+  const { data: entries, error } = await supabase
+    .from("league_players")
+    .select("id, league_id, leagues!inner(name, event_date, venues(name))")
+    .eq("profile_id", profileId)
+    .gte("leagues.event_date", fromDate);
+  if (error) throw error;
+
+  const leagues = await Promise.all(entries.map((e) => getLeague(e.league_id)));
+  const out: MyMatch[] = [];
+  entries.forEach((entry, i) => {
+    const league = leagues[i];
+    if (!league) return;
+    const nameOf = (id: string) =>
+      league.players.find((p) => p.id === id)?.name ?? league.teams.find((t) => t.id === id)?.name ?? "?";
+    // A side holds player ids, or a single team id for round-robin.
+    const isMine = (side: string[]) =>
+      side.includes(entry.id) || league.teams.some((t) => t.id === side[0] && t.playerIds.includes(entry.id));
+    for (const round of league.rounds) {
+      for (const m of round.matches) {
+        const onA = isMine(m.sideA);
+        if (!onA && !isMine(m.sideB)) continue;
+        out.push({
+          id: m.id,
+          leagueName: entry.leagues.name,
+          eventDate: entry.leagues.event_date,
+          venueName: entry.leagues.venues?.name ?? "?",
+          roundNumber: round.roundNumber,
+          court: m.court,
+          opponents: (onA ? m.sideB : m.sideA).map(nameOf),
+          scoreA: m.scoreA,
+          scoreB: m.scoreB,
+        });
+      }
+    }
+  });
+  return out.sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.roundNumber - b.roundNumber);
+}
+
+/* =====================================================================
+   Realtime — reload whenever bookings, venues or leagues change anywhere.
    ===================================================================== */
 export function subscribeToChanges(onChange: () => void) {
   let channel = supabase.channel("club-changes");
-  for (const table of ["venues", "courts", "bookings", "booking_participants"]) {
+  for (const table of [
+    "venues",
+    "courts",
+    "bookings",
+    "booking_participants",
+    "leagues",
+    "league_players",
+    "league_teams",
+    "matches",
+  ]) {
     channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange);
   }
   channel.subscribe();
