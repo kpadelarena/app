@@ -115,7 +115,8 @@ Vercel 프로젝트(Production, Preview 모두)에 두 값을 넣습니다. 빌�
 
 Supabase **Authentication → URL Configuration**: Site URL은 Vercel 운영 주소,
 Redirect URLs에 `https://kpadelarena.vercel.app/**`(운영, 비밀번호 재설정
-페이지 등 하위 경로용), `https://*-kpadelarena.vercel.app/**`(프리뷰),
+페이지 등 하위 경로용), `https://app-*-k-padel-arena.vercel.app/**`(PR 프리뷰: 브랜치 별칭과 배포별 주소
+모두 이 모양),
 `http://localhost:3000/**`(로컬)을 추가합니다.
 
 (anon key는 브라우저에 노출돼도 안전합니다 — 실제 접근 제어는 RLS 정책이
