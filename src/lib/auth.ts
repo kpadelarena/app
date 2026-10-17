@@ -65,8 +65,10 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
-/* The signed-in member's profile and contact details, or null when signed out. */
-export async function getCurrentMember(): Promise<{ member: Member; contact: Contact } | null> {
+/* The signed-in member's profile and contact details, or null when signed out.
+   `hasPassword` is whether the account signed up with email and password,
+   as opposed to Google only. */
+export async function getCurrentMember(): Promise<{ member: Member; contact: Contact; hasPassword: boolean } | null> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -77,8 +79,10 @@ export async function getCurrentMember(): Promise<{ member: Member; contact: Con
     supabase.from("profile_contacts").select("email, phone").eq("id", session.user.id).maybeSingle(),
   ]);
   if (!profile) return null;
+  const providers = (session.user.app_metadata?.providers as string[] | undefined) ?? [];
   return {
     member: toMember(profile),
     contact: { email: contact?.email ?? session.user.email ?? null, phone: contact?.phone ?? null },
+    hasPassword: providers.includes("email") || (session.user.identities ?? []).some((i) => i.provider === "email"),
   };
 }

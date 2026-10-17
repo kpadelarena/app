@@ -8,7 +8,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import type { Contact, Member } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { LevelSlider } from "./LevelSlider";
-import { MIN_PASSWORD, PASSWORD_HINT, signUpSchema, validate } from "./validation";
+import { MIN_PASSWORD, PASSWORD_HINT, newPasswordSchema, signUpSchema, validate } from "./validation";
 
 export interface SignUpForm {
   name: string;
@@ -33,6 +33,9 @@ interface AuthModalProps {
   onUploadProfilePhoto: (file: File) => void | Promise<void>;
   onSetProfilePhotoUrl: (url: string) => void;
   onSaveProfile: (changes: { level: number; phone: string }) => Promise<{ error?: string }>;
+  onChangePassword: (password: string) => Promise<{ error?: string }>;
+  /** Only accounts that signed up with a password get the change section; Google-only accounts do not. */
+  canChangePassword: boolean;
   profileUploading: boolean;
   onClose: () => void;
 }
@@ -131,6 +134,8 @@ export function AuthModal({
   onUploadProfilePhoto,
   onSetProfilePhotoUrl,
   onSaveProfile,
+  onChangePassword,
+  canChangePassword,
   profileUploading,
   onClose,
 }: AuthModalProps) {
@@ -156,6 +161,34 @@ export function AuthModal({
   const [draftPhone, setDraftPhone] = useState(contact?.phone ?? "");
   const [profileNotice, setProfileNotice] = useState<{ text: string; error: boolean } | null>(null);
   const profileChanged = !!member && (draftLevel !== member.level || draftPhone.trim() !== (contact?.phone ?? ""));
+
+  // Password change lives in its own collapsed section of the profile.
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [passwordNotice, setPasswordNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const newPasswordErrors = validate(newPasswordSchema, { password: newPassword, passwordConfirm: newPasswordConfirm });
+  const newPasswordValid = Object.keys(newPasswordErrors).length === 0;
+
+  const submitPasswordChange = async () => {
+    if (!newPasswordValid) return;
+    setBusy(true);
+    const result = await onChangePassword(newPassword);
+    setBusy(false);
+    if (result.error) {
+      setPasswordNotice({
+        text: /different from the old/i.test(result.error)
+          ? "기존 비밀번호와 다른 비밀번호를 입력해 주세요."
+          : "비밀번호를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.",
+        error: true,
+      });
+      return;
+    }
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    setChangingPassword(false);
+    setPasswordNotice({ text: "비밀번호를 바꿨어요.", error: false });
+  };
 
   const saveProfile = async () => {
     setBusy(true);
@@ -298,6 +331,60 @@ export function AuthModal({
               style={fieldStyle}
             />
           </label>
+
+          {canChangePassword && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                onClick={() => {
+                  setChangingPassword(!changingPassword);
+                  setPasswordNotice(null);
+                }}
+                style={{ ...linkButtonStyle, alignSelf: "flex-start", padding: 0, color: C.turf, fontWeight: 700 }}
+              >
+                {changingPassword ? "비밀번호 변경 닫기" : "비밀번호 변경"}
+              </button>
+              {changingPassword && (
+                <>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="새 비밀번호"
+                    autoComplete="new-password"
+                    style={fieldStyle}
+                  />
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: newPassword && newPasswordErrors.password ? C.danger : "rgba(27,36,34,0.5)",
+                    }}
+                  >
+                    {(newPassword && newPasswordErrors.password) || PASSWORD_HINT}
+                  </div>
+                  <input
+                    type="password"
+                    value={newPasswordConfirm}
+                    onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                    placeholder="새 비밀번호 확인"
+                    autoComplete="new-password"
+                    onKeyDown={(e) => e.key === "Enter" && submitPasswordChange()}
+                    style={fieldStyle}
+                  />
+                  {newPasswordConfirm && newPasswordErrors.passwordConfirm && (
+                    <div style={{ fontSize: 11, color: C.danger }}>{newPasswordErrors.passwordConfirm}</div>
+                  )}
+                  <PrimaryButton onClick={submitPasswordChange} disabled={busy || !newPasswordValid}>
+                    {busy ? "저장 중..." : "비밀번호 바꾸기"}
+                  </PrimaryButton>
+                </>
+              )}
+              {passwordNotice && (
+                <div style={{ fontSize: 12, color: passwordNotice.error ? C.danger : C.turf }}>
+                  {passwordNotice.text}
+                </div>
+              )}
+            </div>
+          )}
 
           {profileNotice && (
             <div style={{ fontSize: 12, color: profileNotice.error ? C.danger : C.turf }}>{profileNotice.text}</div>

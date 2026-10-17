@@ -188,3 +188,17 @@ test("the sign-up button waits for a matching, valid password", async ({ page })
   await expect(page.getByText("비밀번호에 숫자를 넣어 주세요.")).toBeVisible();
   await expect(submit).toBeDisabled();
 });
+
+test("a signed-in member can change their password from the profile card", async ({ page }) => {
+  const changeTo = async (password: string) => {
+    await page.getByRole("button", { name: "비밀번호 변경", exact: true }).click();
+    await page.getByPlaceholder("새 비밀번호", { exact: true }).fill(password);
+    await page.getByPlaceholder("새 비밀번호 확인").fill(password);
+    await page.getByRole("button", { name: "비밀번호 바꾸기" }).click();
+    await expect(page.getByText("비밀번호를 바꿨어요.")).toBeVisible();
+  };
+  await logIn(page, OWNER);
+  await page.getByRole("button", { name: OWNER.name }).click();
+  await changeTo(`temp-${Date.now()}`);
+  await changeTo(OWNER.password);
+});

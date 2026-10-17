@@ -1,6 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { getCurrentMember, requestPasswordReset, signIn, signInWithGoogle, signOut, signUp } from "@/lib/auth";
+import {
+  getCurrentMember,
+  requestPasswordReset,
+  signIn,
+  signInWithGoogle,
+  signOut,
+  signUp,
+  updatePassword,
+} from "@/lib/auth";
 import { setAvatarUrl, updateContactPhone, updateProfileLevel, uploadAvatar } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabaseClient";
@@ -24,6 +32,7 @@ export function useSession() {
   });
   const member = sessionQuery.data?.member ?? null;
   const contact = sessionQuery.data?.contact ?? null;
+  const hasPassword = sessionQuery.data?.hasPassword ?? false;
 
   // Everything else is re-read on sign-in/out: what a visitor may see
   // depends on who they are (booking participants, league rosters, ...).
@@ -79,6 +88,12 @@ export function useSession() {
 
   const resetPassword = useCallback(async (email: string): Promise<{ error?: string }> => {
     const result = await requestPasswordReset(email);
+    return result.error ? { error: result.error.message } : {};
+  }, []);
+
+  /* For the signed-in member; also lets a Google account add a password. */
+  const changePassword = useCallback(async (password: string): Promise<{ error?: string }> => {
+    const result = await updatePassword(password);
     return result.error ? { error: result.error.message } : {};
   }, []);
 
@@ -163,6 +178,7 @@ export function useSession() {
   return {
     member,
     contact,
+    hasPassword,
     isAdmin,
     isLoading: sessionQuery.isPending,
     profileUploading,
@@ -170,6 +186,7 @@ export function useSession() {
     logIn,
     logInWithGoogle,
     resetPassword,
+    changePassword,
     logOut,
     updatePhoto,
     updatePhotoUrl,
