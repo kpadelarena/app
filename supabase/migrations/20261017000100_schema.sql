@@ -21,7 +21,6 @@ create type public.league_format as enum ('americano', 'mexicano', 'round_robin'
 -- ---------------------------------------------------------------------
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  email text,
   display_name text not null,
   phone text,
   level numeric(2, 1) not null default 3.0 check (level between 0 and 7),
@@ -39,10 +38,9 @@ as $$
 declare
   meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
 begin
-  insert into public.profiles (id, email, display_name, photo_url, role)
+  insert into public.profiles (id, display_name, photo_url, role)
   values (
     new.id,
-    new.email,
     coalesce(
       nullif(meta ->> 'display_name', ''),
       nullif(meta ->> 'full_name', ''),
@@ -86,8 +84,7 @@ create table public.venues (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   address text,
-  timezone text not null default 'Asia/Seoul',
-  open_time time not null default '07:00',
+  open_time time not null default '07:00', -- venue-local wall-clock hours; the venue timezone is an app constant
   close_time time not null default '22:00',
   max_players int not null default 6 check (max_players between 2 and 12), -- per booking
   amenities jsonb not null default '{}'::jsonb,
