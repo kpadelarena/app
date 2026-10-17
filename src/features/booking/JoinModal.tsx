@@ -85,7 +85,7 @@ function AdminControls({
         gap: 12,
       }}
     >
-      <Eyebrow color={C.charcoal}>관리자</Eyebrow>
+      <Eyebrow>관리자</Eyebrow>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {KINDS.map((k) => (

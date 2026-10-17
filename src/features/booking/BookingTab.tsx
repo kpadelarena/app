@@ -166,7 +166,7 @@ export function BookingTab({
   return (
     <>
       <SectionCard>
-        <Eyebrow color={C.charcoal}>날짜선택</Eyebrow>
+        <Eyebrow>날짜선택</Eyebrow>
         <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
           {days.map((d) => (
             <button
