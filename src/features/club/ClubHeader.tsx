@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Share2, Trophy } from "lucide-react";
+import { ChevronDown, Share2 } from "lucide-react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import type { Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
@@ -106,18 +106,31 @@ export function ClubHeader({ venues, venueId, onSelectVenue, account, tabs }: Cl
   return (
     <div style={{ background: C.ink, color: "#fff", padding: "20px 20px 0" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Trophy size={18} color={C.ball} />
-            <Eyebrow color={C.ball}>{CLUB_NAME.toUpperCase()} MANAGER</Eyebrow>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+            <img
+              src="/brand-logo.jpg"
+              alt=""
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 14,
+                objectFit: "cover",
+                flexShrink: 0,
+                border: `1px solid ${C.glass}`,
+              }}
+            />
+            <div style={{ minWidth: 0 }}>
+              <Eyebrow color={C.ball}>{CLUB_NAME.toUpperCase()} MANAGER</Eyebrow>
+              <h1
+                style={{ fontFamily: FONT.display, fontSize: 28, fontWeight: 700, margin: "2px 0 0", lineHeight: 1.1 }}
+              >
+                {CLUB_NAME}
+              </h1>
+            </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <img src="/brand-logo.jpg" alt={CLUB_NAME} style={{ width: 108, height: 27, objectFit: "contain" }} />
-            <ShareButton />
-          </div>
+          <ShareButton />
         </div>
-
-        <h1 style={{ fontFamily: FONT.display, fontSize: 28, fontWeight: 700, margin: "8px 0 0" }}>{CLUB_NAME}</h1>
 
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
           <VenueSelect venues={venues} value={venueId} onChange={onSelectVenue} />
