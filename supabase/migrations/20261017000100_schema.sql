@@ -84,7 +84,8 @@ create table public.venues (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   address text,
-  open_time time not null default '07:00', -- venue-local wall-clock hours; the venue timezone is an app constant
+  timezone text not null default 'Asia/Seoul', -- open/close times and booking days are read in this zone
+  open_time time not null default '07:00',
   close_time time not null default '22:00',
   max_players int not null default 6 check (max_players between 2 and 12), -- per booking
   amenities jsonb not null default '{}'::jsonb,
