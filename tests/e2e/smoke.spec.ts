@@ -43,4 +43,15 @@ test("the owner can book a free court slot and see it in their schedule", async 
 
   await page.getByRole("button", { name: "내 일정" }).click();
   await expect(page.getByText("Yongsan Mmove · 코트").first()).toBeVisible();
+
+  // As an admin, delete the booking again from the grid.
+  await page.getByRole("button", { name: "코트 예약" }).click();
+  await pickLastDay(page);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: /5자리 남음/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "예약 삭제" }).click();
+  await expect(freeSlots).toHaveCount(before);
 });

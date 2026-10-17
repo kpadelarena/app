@@ -4,7 +4,7 @@ import { EmptyHint } from "@/components/ui/EmptyHint";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { kindOf } from "@/features/booking/constants";
+import { changesOpen, kindOf } from "@/features/booking/constants";
 import { zonedDate } from "@/features/booking/slots";
 import { getMyBookings } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
@@ -27,8 +27,15 @@ const timeRange = (startsAt: string, endsAt: string) => {
   return `${fmt(startsAt)}–${fmt(endsAt)}`;
 };
 
+interface MyScheduleTabProps {
+  member: Member | null;
+  isAdmin: boolean;
+  onLeave: (participantId: string) => void;
+  onOpenAuth: () => void;
+}
+
 /* The signed-in member's upcoming court bookings at any venue. */
-export function MyScheduleTab({ member, onOpenAuth }: { member: Member | null; onOpenAuth: () => void }) {
+export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MyScheduleTabProps) {
   const { data: bookings } = useQuery({
     queryKey: queryKeys.myBookings.forMember(member?.id ?? ""),
     queryFn: () => getMyBookings(member!.id, new Date()),
@@ -66,18 +73,37 @@ export function MyScheduleTab({ member, onOpenAuth }: { member: Member | null; o
                     {b.venueName} · 코트 {b.courtName}
                   </div>
                 </div>
-                <span
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    background: kindOf(b.kind).color,
-                    color: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  {kindOf(b.kind).label}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: kindOf(b.kind).color,
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {kindOf(b.kind).label}
+                  </span>
+                  {(isAdmin || changesOpen(b.startsAt)) && (
+                    <button
+                      onClick={() => onLeave(b.participantId)}
+                      style={{
+                        background: "none",
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        borderRadius: 999,
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "rgba(27,36,34,0.6)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      취소
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

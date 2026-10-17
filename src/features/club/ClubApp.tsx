@@ -95,12 +95,21 @@ export function ClubApp() {
               onCreate={club.createBooking}
               onJoin={club.joinBooking}
               onLeave={club.leaveBooking}
+              onUpdate={club.updateBooking}
+              onDelete={club.deleteBooking}
               onOpenAuth={openAuth}
             />
           </div>
         )}
 
-        {tab === "myschedule" && <MyScheduleTab member={session.member} onOpenAuth={openAuth} />}
+        {tab === "myschedule" && (
+          <MyScheduleTab
+            member={session.member}
+            isAdmin={session.isAdmin}
+            onLeave={club.leaveBooking}
+            onOpenAuth={openAuth}
+          />
+        )}
 
         {tab === "league" && <LeaguePlaceholder />}
 

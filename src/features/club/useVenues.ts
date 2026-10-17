@@ -5,12 +5,15 @@ import { addHours, toInstant, zonedDate } from "@/features/booking/slots";
 import {
   addParticipant,
   createBooking,
+  deleteBooking,
   getBookings,
   getVenues,
   removeParticipant,
   subscribeToChanges,
+  updateBooking,
   updateVenue,
   uploadVenuePhoto,
+  type BookingPatch,
   type NewBooking,
   type Who,
 } from "@/lib/db";
@@ -89,6 +92,9 @@ export function useVenues(memberId: string | null) {
     joinBooking: (bookingId: string, who: Who) =>
       memberId && bookingWrite.mutate(() => addParticipant(bookingId, who, memberId)),
     leaveBooking: (participantId: string) => bookingWrite.mutate(() => removeParticipant(participantId)),
+    updateBooking: (bookingId: string, patch: BookingPatch) =>
+      bookingWrite.mutate(() => updateBooking(bookingId, patch)),
+    deleteBooking: (bookingId: string) => bookingWrite.mutate(() => deleteBooking(bookingId)),
 
     toggleAmenity: (key: string) => {
       if (!venue) return;
