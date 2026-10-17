@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // The dev logins seeded by supabase/seed.sql.
-const OWNER = { email: "owner@example.com", password: "padel-dev", name: "관리자" };
+const OWNER = { email: "owner@example.com", password: "padel-dev1", name: "관리자" };
 
 /* The last day in the picker, so every slot on it is in the future. */
 const pickLastDay = (page: Page) =>
@@ -123,7 +123,7 @@ test("the owner can change a member's role and change it back", async ({ page })
   await expect(page.getByLabel("이서연 역할")).toHaveValue("member");
 });
 
-const MEMBER = { email: "member@example.com", password: "padel-dev", name: "이서연" };
+const MEMBER = { email: "member@example.com", password: "padel-dev1", name: "이서연" };
 
 /* The local stack delivers auth mail to Mailpit; this returns the first link in the newest message to `email`. */
 async function latestMailLink(email: string) {
@@ -165,4 +165,27 @@ test("a member can reset their password from the emailed link", async ({ page })
   // Supabase refuses a password equal to the current one, so change it and then restore the seeded one.
   const first = await resetPasswordTo(page, `temp-${Date.now()}`, null);
   await resetPasswordTo(page, MEMBER.password, first);
+});
+
+test("the sign-up button waits for a matching, valid password", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "회원가입 · 로그인" }).click();
+  await page.getByRole("button", { name: "+ 새 회원가입" }).click();
+  const submit = page.getByRole("button", { name: "가입하기" });
+
+  await page.getByPlaceholder("이름").first().fill("테스트");
+  await page.getByPlaceholder("이메일").fill("new@example.com");
+  await page.getByPlaceholder("비밀번호", { exact: true }).fill("padel2026");
+  await expect(submit).toBeDisabled();
+
+  await page.getByPlaceholder("비밀번호 확인").fill("padel2025");
+  await expect(page.getByText("비밀번호가 일치하지 않아요.")).toBeVisible();
+  await expect(submit).toBeDisabled();
+
+  await page.getByPlaceholder("비밀번호 확인").fill("padel2026");
+  await expect(submit).toBeEnabled();
+
+  await page.getByPlaceholder("비밀번호", { exact: true }).fill("padelpadel");
+  await expect(page.getByText("비밀번호에 숫자를 넣어 주세요.")).toBeVisible();
+  await expect(submit).toBeDisabled();
 });

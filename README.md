@@ -88,6 +88,10 @@ Project Settings, API Keys, API Key Secrets (모두 Read). 마이그레이션은
 Supabase 기본 메일 발송은 시간당 몇 통으로 제한되므로, 가입이 많아지면
 Resend 같은 SMTP를 **Project Settings → Auth → SMTP**에 연결하세요.
 
+앱은 비밀번호를 8자 이상, 영문과 숫자 포함으로 검사합니다. 서버도 같은 기준을
+쓰도록 Authentication → Providers → Email에서 Minimum password length 8,
+Password requirements "Letters and digits"로 맞춰 둡니다(로컬 config.toml과 동일).
+
 ### 3-1. Google 로그인
 
 Supabase Dashboard → Authentication → Providers → Google에 Google Cloud에서 만든
