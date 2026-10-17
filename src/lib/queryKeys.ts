@@ -9,6 +9,10 @@ export const queryKeys = {
     all: ["bookings"] as const,
     forVenue: (venueId: string, fromIso: string) => ["bookings", venueId, fromIso] as const,
   },
+  booking: {
+    all: ["booking"] as const,
+    detail: (bookingId: string) => ["booking", bookingId] as const,
+  },
   myBookings: {
     all: ["myBookings"] as const,
     forMember: (memberId: string) => ["myBookings", memberId] as const,

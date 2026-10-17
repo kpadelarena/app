@@ -237,6 +237,13 @@ export function ClubApp() {
             member={session.member}
             isAdmin={session.isAdmin}
             onLeave={club.leaveBooking}
+            onJoin={club.joinBooking}
+            onUpdate={club.updateBooking}
+            onDelete={club.deleteBooking}
+            bookingId={route.bookingId}
+            onOpenBooking={(b) => go({ bookingId: b.id })}
+            onCloseBooking={() => go({ bookingId: null }, true)}
+            onOpenMatch={(m) => go({ venueId: m.venueId, tab: "league", leagueId: m.leagueId, leagueTab: "schedule" })}
             onOpenAuth={openAuth}
           />
         )}

@@ -9,6 +9,7 @@
      /venues/<id>/leagues                 리그 list
      /venues/<id>/leagues/<leagueId>[/schedule|/standings]
      /schedule                            내 일정 (club-wide)
+     /schedule/<bookingId>                내 일정 with one booking's sheet open
      /members                             회원 (club-wide)
      /account                             the profile / sign-in sheet, over the last venue shown
 
@@ -32,7 +33,7 @@ export interface AppRoute {
   tab: TabKey;
   /** Booking day as YYYY-MM-DD; null means today. */
   date: string | null;
-  /** A booking whose sheet is open; always comes with an explicit date. */
+  /** A booking whose sheet is open: under a venue day, or over 내 일정. */
   bookingId: string | null;
   leagueId: string | null;
   leagueTab: LeagueTabKey;
@@ -76,6 +77,7 @@ export function parseRoute(pathname: string): AppRoute {
   }
   const globalTab = TAB_KEYS.find((key) => GLOBAL_SEGMENT[key] === parts[0]);
   if (globalTab) route.tab = globalTab;
+  if (globalTab === "myschedule" && parts[1]) route.bookingId = parts[1];
   return route;
 }
 
@@ -99,6 +101,7 @@ export function buildPath(route: AppRoute): string {
     }
   } else {
     parts.push(GLOBAL_SEGMENT[route.tab]!);
+    if (route.tab === "myschedule" && route.bookingId) parts.push(route.bookingId);
   }
   return "/" + parts.join("/");
 }

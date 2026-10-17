@@ -257,6 +257,19 @@ export async function getBookings(venue: Venue, from: Date, to: Date): Promise<B
   return data.map(toBooking);
 }
 
+/* One booking with its venue, for opening it outside the venue's grid
+   (내 일정, shared links). Null when it no longer exists. */
+export async function getBooking(bookingId: string): Promise<{ booking: Booking; venue: Venue } | null> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`${BOOKING_COLUMNS}, courts(venues(*, courts(*)))`)
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || !data.courts?.venues) return null;
+  return { booking: toBooking(data), venue: toVenue(data.courts.venues) };
+}
+
 export interface NewBooking {
   courtId: string;
   startsAt: Date;
@@ -543,7 +556,7 @@ export async function uploadResultPhoto(leagueId: string, file: File) {
 export async function getMyMatches(profileId: string, fromDate: string): Promise<MyMatch[]> {
   const { data: entries, error } = await supabase
     .from("league_players")
-    .select("id, league_id, leagues!inner(name, event_date, venues(name))")
+    .select("id, league_id, leagues!inner(name, event_date, venue_id, venues(name))")
     .eq("profile_id", profileId)
     .gte("leagues.event_date", fromDate);
   if (error) throw error;
@@ -564,7 +577,9 @@ export async function getMyMatches(profileId: string, fromDate: string): Promise
         if (!onA && !isMine(m.sideB)) continue;
         out.push({
           id: m.id,
+          leagueId: entry.league_id,
           leagueName: entry.leagues.name,
+          venueId: entry.leagues.venue_id,
           eventDate: entry.leagues.event_date,
           venueName: entry.leagues.venues?.name ?? "?",
           roundNumber: round.roundNumber,
