@@ -3,11 +3,13 @@
    are linkable and survive a reload.
 
      /                                   → default venue (redirects once venues load)
-     /venues/<id>                         코트 예약 (the venue's page, today)
-     /venues/<id>/<YYYY-MM-DD>            코트 예약 on another day of the coming week
-     /venues/<id>/<YYYY-MM-DD>/<bookingId> that day with one booking's sheet open (the share link)
-     /venues/<id>/leagues                 리그 list
-     /venues/<id>/leagues/<leagueId>[/schedule|/standings]
+     /venues/<slug>                       코트 예약 (the venue's page, today)
+     /venues/<slug>/<YYYY-MM-DD>          코트 예약 on another day of the coming week
+     /venues/<slug>/<YYYY-MM-DD>/<bookingId> that day with one booking's sheet open (the share link)
+     /venues/<slug>/leagues               리그 list
+     /venues/<slug>/leagues/<leagueId>[/schedule|/standings]
+
+   <slug> is the venue's admin-chosen slug (an id still resolves).
      /schedule                            내 일정 (club-wide)
      /schedule/<bookingId>                내 일정 with one booking's sheet open
      /members                             회원 (club-wide)
@@ -28,7 +30,7 @@ export const LEAGUE_TABS = ["players", "schedule", "standings"] as const;
 export type LeagueTabKey = (typeof LEAGUE_TABS)[number];
 
 export interface AppRoute {
-  /** Null on club-wide tabs and on "/". */
+  /** The venue's slug from the URL; null on club-wide tabs and on "/". */
   venueId: string | null;
   tab: TabKey;
   /** Booking day as YYYY-MM-DD; null means today. */

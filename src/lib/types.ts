@@ -32,6 +32,8 @@ export interface Court {
 
 export interface Venue {
   id: string;
+  /** Short name used in URLs, e.g. "yongsan". */
+  slug: string;
   name: string;
   address: string | null;
   timezone: string;

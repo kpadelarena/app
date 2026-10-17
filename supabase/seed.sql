@@ -35,10 +35,10 @@ update public.profiles set role = 'admin' where id = '22222222-2222-4222-8222-22
 update public.profile_contacts set phone = '010-1234-5678' where id = '11111111-1111-4111-8111-111111111111';
 
 -- Venues and courts.
-insert into public.venues (id, name, address, sort_order) values
-  ('a1a1a1a1-0000-4000-8000-000000000001', 'Yongsan Mmove', '서울 용산구', 1),
-  ('a1a1a1a1-0000-4000-8000-000000000002', 'Gimpo Padel Society', '경기 김포시', 2),
-  ('a1a1a1a1-0000-4000-8000-000000000003', 'Dongtan Garros Padel', '경기 화성시 동탄', 3);
+insert into public.venues (id, slug, name, address, sort_order) values
+  ('a1a1a1a1-0000-4000-8000-000000000001', 'yongsan', 'Yongsan Mmove', '서울 용산구', 1),
+  ('a1a1a1a1-0000-4000-8000-000000000002', 'gimpo', 'Gimpo Padel Society', '경기 김포시', 2),
+  ('a1a1a1a1-0000-4000-8000-000000000003', 'dongtan', 'Dongtan Garros Padel', '경기 화성시 동탄', 3);
 
 insert into public.courts (venue_id, name, sort_order)
 select v.id, c.name, c.sort_order

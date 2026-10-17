@@ -3,7 +3,7 @@
 -- transaction that is rolled back at the end.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(42);
+select plan(44);
 
 -- Helpers to act as a signed-in user, or as a logged-out visitor.
 create function pg_temp.login(uid uuid) returns void language plpgsql as $$
@@ -95,12 +95,18 @@ select throws_ok(
   $$ insert into public.profiles (id, display_name) values ('00000000-0000-4000-8000-000000000099', 'Fake') $$,
   '42501', null, 'a member cannot insert a profile');
 select throws_ok(
-  $$ insert into public.venues (name) values ('Rogue Venue') $$,
+  $$ insert into public.venues (slug, name) values ('rogue', 'Rogue Venue') $$,
   '42501', null, 'a member cannot create a venue');
 
 -- Venues
 select pg_temp.superuser();
-insert into public.venues (id, name, max_players) values ('a0000000-0000-4000-8000-000000000001', 'Test Venue', 3);
+insert into public.venues (id, slug, name, max_players) values ('a0000000-0000-4000-8000-000000000001', 'test', 'Test Venue', 3);
+select throws_ok(
+  $$ insert into public.venues (slug, name) values ('test', 'Same slug') $$,
+  '23505', null, 'venue slugs are unique');
+select throws_ok(
+  $$ insert into public.venues (slug, name) values ('Bad Slug!', 'Bad slug') $$,
+  '23514', null, 'venue slugs are lowercase letters, digits and hyphens');
 insert into public.courts (id, venue_id, name) values ('c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', '1');
 
 select pg_temp.superuser();

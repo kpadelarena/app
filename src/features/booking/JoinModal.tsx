@@ -249,7 +249,13 @@ export function JoinModal({
     >
       {booking && (
         <CopyLinkButton
-          href={buildPath({ ...HOME_ROUTE, venueId: venue.id, tab: "booking", date: slot.date, bookingId: booking.id })}
+          href={buildPath({
+            ...HOME_ROUTE,
+            venueId: venue.slug,
+            tab: "booking",
+            date: slot.date,
+            bookingId: booking.id,
+          })}
         />
       )}
       {!member && (

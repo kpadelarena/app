@@ -31,7 +31,8 @@ const PHOTO_ERROR = "사진 저장에 실패했어요. 권한이 있는 계정�
 /* The venues, the one on screen, and its bookings for the coming days.
    Writes go to the database and then invalidate what they changed; a
    failed write raises `saveError`. */
-export function useVenues(memberId: string | null, venueId: string | null) {
+/* `venueKey` is the slug from the URL; an id resolves too so old links keep working. */
+export function useVenues(memberId: string | null, venueKey: string | null) {
   const queryClient = useQueryClient();
   const [saveError, setSaveError] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -39,7 +40,7 @@ export function useVenues(memberId: string | null, venueId: string | null) {
 
   const venuesQuery = useQuery({ queryKey: queryKeys.venues, queryFn: getVenues });
   const venues = venuesQuery.data ?? [];
-  const venue = venues.find((v) => v.id === venueId) ?? venues[0] ?? null;
+  const venue = venues.find((v) => v.slug === venueKey || v.id === venueKey) ?? venues[0] ?? null;
 
   // The calendar starts at today's midnight at the venue; the key changes
   // once a day, so a tab left open rolls over on its own.

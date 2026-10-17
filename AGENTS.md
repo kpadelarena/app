@@ -82,7 +82,7 @@ These are non-negotiable. The repository is public.
 
 ## Data model in one breath
 
-One club, many venues. `venues` → `courts` → `bookings` (match / lesson /
+One club, many venues. `venues` (with an admin-chosen `slug` for URLs) → `courts` → `bookings` (match / lesson /
 league; public or private) → `booking_participants` (a member _or_ a named
 guest). `profiles` (one per auth user; role owner / admin / member; first
 account becomes owner) + `profile_contacts`. League events: `leagues` →

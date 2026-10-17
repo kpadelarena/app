@@ -78,22 +78,22 @@ export function ClubApp() {
 
   useEffect(() => {
     if (!venue) return;
-    setLastVenueId(venue.id);
-    storeLastVenue(venue.id);
+    setLastVenueId(venue.slug);
+    storeLastVenue(venue.slug);
   }, [venue]);
 
   /* Navigates to a changed route. Closing a sheet replaces the entry so
      Back does not reopen it. */
   const go = (changes: Partial<AppRoute>, replace = false) => {
-    const path = buildPath({ ...route, venueId: route.venueId ?? venue?.id ?? null, ...changes });
+    const path = buildPath({ ...route, venueId: route.venueId ?? venue?.slug ?? null, ...changes });
     if (replace) router.replace(path);
     else router.push(path);
   };
 
   // "/" or an unknown venue id on a venue tab: settle on the venue actually shown.
   useEffect(() => {
-    if (venue && !route.account && VENUE_TABS.includes(route.tab) && route.venueId !== venue.id) {
-      router.replace(buildPath({ ...route, venueId: venue.id }));
+    if (venue && !route.account && VENUE_TABS.includes(route.tab) && route.venueId !== venue.slug) {
+      router.replace(buildPath({ ...route, venueId: venue.slug }));
     }
   }, [venue, route, router]);
 
@@ -143,7 +143,7 @@ export function ClubApp() {
           <NewVenueForm
             onCreate={async (input) => {
               const id = await club.createVenue(input);
-              if (id) go({ venueId: id, tab: "booking" });
+              if (id) go({ venueId: input.slug, tab: "booking" });
               return id;
             }}
           />
@@ -169,7 +169,15 @@ export function ClubApp() {
       <ClubHeader
         venues={club.venues}
         venueId={venue.id}
-        onSelectVenue={(id) => go({ venueId: id, date: null, bookingId: null, leagueId: null, leagueTab: "players" })}
+        onSelectVenue={(id) =>
+          go({
+            venueId: club.venues.find((v) => v.id === id)?.slug ?? id,
+            date: null,
+            bookingId: null,
+            leagueId: null,
+            leagueTab: "players",
+          })
+        }
         onAddVenue={session.isAdmin ? () => setAddingVenue(true) : undefined}
         account={<AccountButton member={session.member} onClick={openAuth} active={route.account} />}
         tabs={
@@ -243,7 +251,14 @@ export function ClubApp() {
             bookingId={route.bookingId}
             onOpenBooking={(b) => go({ bookingId: b.id })}
             onCloseBooking={() => go({ bookingId: null }, true)}
-            onOpenMatch={(m) => go({ venueId: m.venueId, tab: "league", leagueId: m.leagueId, leagueTab: "schedule" })}
+            onOpenMatch={(m) =>
+              go({
+                venueId: club.venues.find((v) => v.id === m.venueId)?.slug ?? m.venueId,
+                tab: "league",
+                leagueId: m.leagueId,
+                leagueTab: "schedule",
+              })
+            }
             onOpenAuth={openAuth}
           />
         )}
@@ -282,7 +297,7 @@ export function ClubApp() {
           onCreate={async (input) => {
             // Land on the new venue's booking tab; its settings open by themselves while it has no courts.
             const id = await club.createVenue(input);
-            if (id) go({ venueId: id, tab: "booking", leagueId: null });
+            if (id) go({ venueId: input.slug, tab: "booking", leagueId: null });
             return id;
           }}
           onClose={() => setAddingVenue(false)}

@@ -7,6 +7,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
 import type { NewVenue, VenuePatch } from "@/lib/db";
 import type { Venue } from "@/lib/types";
+import { isValidSlug, SLUG_HINT } from "./validation";
 import { C, FONT } from "@/styles/tokens";
 
 const dim = "rgba(27,36,34,0.5)";
@@ -34,35 +35,50 @@ interface NewVenueFormProps {
 export function NewVenueForm({ onCreate }: NewVenueFormProps) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [slug, setSlug] = useState("");
   const [busy, setBusy] = useState(false);
+  const slugOk = isValidSlug(slug);
 
   const create = async () => {
     if (!name.trim() || busy) return;
     setBusy(true);
-    const id = await onCreate({ name: name.trim(), address: address.trim() || null });
+    const id = await onCreate({ slug: slug.trim(), name: name.trim(), address: address.trim() || null });
     setBusy(false);
     if (id) {
       setName("");
       setAddress("");
+      setSlug("");
     }
   };
 
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", width: "100%" }}>
-      <Field label="지점 이름">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="예: Yongsan Mmove"
-          style={fieldStyle}
-        />
-      </Field>
-      <Field label="주소">
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="선택" style={fieldStyle} />
-      </Field>
-      <PrimaryButton onClick={create} icon={Plus} disabled={!name.trim() || busy}>
-        지점 추가
-      </PrimaryButton>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="지점 이름">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="예: Yongsan Mmove"
+            style={fieldStyle}
+          />
+        </Field>
+        <Field label="주소">
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="선택" style={fieldStyle} />
+        </Field>
+        <Field label="주소용 이름 (URL)">
+          <input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value.toLowerCase())}
+            placeholder="yongsan"
+            autoCapitalize="off"
+            style={{ ...fieldStyle, fontFamily: FONT.mono, borderColor: slug && !slugOk ? C.danger : undefined }}
+          />
+        </Field>
+        <PrimaryButton onClick={create} icon={Plus} disabled={!name.trim() || !slugOk || busy}>
+          지점 추가
+        </PrimaryButton>
+      </div>
+      <div style={{ fontSize: 11, color: slug && !slugOk ? C.danger : dim }}>주소용 이름: {SLUG_HINT}</div>
     </div>
   );
 }
@@ -74,7 +90,7 @@ export function NewVenueSheet({ onCreate, onClose }: NewVenueFormProps & { onClo
     <BottomSheet header={<Eyebrow>새 지점</Eyebrow>} headerAlign="center" onClose={onClose}>
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontSize: 13, color: dim }}>
-          이름만 있으면 만들 수 있어요. 운영 시간, 코트, 편의시설은 만든 뒤 지점 설정에서 정해요.
+          이름과 주소용 이름(URL)만 있으면 만들 수 있어요. 운영 시간, 코트, 편의시설은 만든 뒤 지점 설정에서 정해요.
         </div>
         <NewVenueForm
           onCreate={async (input) => {
@@ -103,10 +119,14 @@ export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCour
   const [open, setOpen] = useState(venue.courts.length === 0);
   const [name, setName] = useState(venue.name);
   const [address, setAddress] = useState(venue.address ?? "");
+  const [slug, setSlug] = useState(venue.slug);
+  const slugOk = isValidSlug(slug);
   const [courtName, setCourtName] = useState("");
 
-  const detailsChanged = name.trim() !== venue.name || (address.trim() || null) !== venue.address;
-  const saveDetails = () => name.trim() && onUpdate({ name: name.trim(), address: address.trim() || null });
+  const detailsChanged =
+    name.trim() !== venue.name || (address.trim() || null) !== venue.address || slug.trim() !== venue.slug;
+  const saveDetails = () =>
+    name.trim() && slugOk && onUpdate({ name: name.trim(), address: address.trim() || null, slug: slug.trim() });
 
   const addCourt = () => {
     const next = courtName.trim() || String(venue.courts.length + 1);
@@ -154,9 +174,23 @@ export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCour
                 style={fieldStyle}
               />
             </Field>
-            <PrimaryButton onClick={saveDetails} disabled={!detailsChanged || !name.trim()}>
+            <PrimaryButton onClick={saveDetails} disabled={!detailsChanged || !name.trim() || !slugOk}>
               저장
             </PrimaryButton>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <Field label="주소용 이름 (URL)">
+              <input
+                value={slug}
+                onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                autoCapitalize="off"
+                style={{ ...fieldStyle, fontFamily: FONT.mono, borderColor: slug && !slugOk ? C.danger : undefined }}
+              />
+            </Field>
+            <div style={{ flex: 2, minWidth: 160, fontSize: 12, color: slugOk ? dim : C.danger, paddingBottom: 10 }}>
+              {slugOk ? `${window.location.host}/venues/${slug.trim()}` : SLUG_HINT}
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

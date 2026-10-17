@@ -113,6 +113,7 @@ export async function getContacts(): Promise<Record<string, Contact>> {
    ===================================================================== */
 const toVenue = (row: Tables<"venues"> & { courts: Tables<"courts">[] }): Venue => ({
   id: row.id,
+  slug: row.slug,
   name: row.name,
   address: row.address,
   timezone: row.timezone,
@@ -134,6 +135,7 @@ export async function getVenues(): Promise<Venue[]> {
 }
 
 export interface NewVenue {
+  slug: string;
   name: string;
   address: string | null;
   sortOrder: number;
@@ -141,10 +143,10 @@ export interface NewVenue {
 
 /* Admins only. Hours, capacity and timezone take the schema defaults.
    Resolves to the new venue's id. */
-export async function createVenue({ name, address, sortOrder }: NewVenue) {
+export async function createVenue({ slug, name, address, sortOrder }: NewVenue) {
   const { data, error } = await supabase
     .from("venues")
-    .insert({ name, address, sort_order: sortOrder })
+    .insert({ slug, name, address, sort_order: sortOrder })
     .select("id")
     .single();
   if (error) throw error;
@@ -152,6 +154,7 @@ export async function createVenue({ name, address, sortOrder }: NewVenue) {
 }
 
 export interface VenuePatch {
+  slug?: string;
   name?: string;
   address?: string | null;
   /** "HH:MM" at the venue. */
@@ -164,6 +167,7 @@ export interface VenuePatch {
 
 export async function updateVenue(venueId: string, patch: VenuePatch) {
   const row: TablesUpdate<"venues"> = {};
+  if (patch.slug !== undefined) row.slug = patch.slug;
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.address !== undefined) row.address = patch.address;
   if (patch.openTime !== undefined) row.open_time = patch.openTime;
