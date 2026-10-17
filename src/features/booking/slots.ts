@@ -1,3 +1,5 @@
+import { VENUE_TIME_ZONE } from "@/features/club/constants";
+
 /** One bookable hour on one court. */
 export interface Slot {
   date: string;
@@ -29,16 +31,31 @@ export interface DayOption {
   isToday: boolean;
 }
 
-export function nextDays(count: number) {
+/* Today's calendar date at the venue, as YYYY-MM-DD. Bookings are for a
+   wall-clock hour at the venue, so "today" must not depend on the viewer's
+   own timezone, nor on UTC (which is still yesterday until 09:00 in Korea). */
+function venueDate(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: VENUE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function nextDays(count: number, now = new Date()) {
+  // Held as UTC midnight so the day arithmetic below is timezone-free.
+  const today = new Date(`${venueDate(now)}T00:00:00Z`);
   const out: DayOption[] = [];
-  const today = new Date();
   for (let i = 0; i < count; i++) {
     const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    d.setUTCDate(today.getUTCDate() + i);
     out.push({
       iso: d.toISOString().slice(0, 10),
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      weekday: WEEKDAY_KR[d.getDay()],
+      label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`,
+      weekday: WEEKDAY_KR[d.getUTCDay()],
       isToday: i === 0,
     });
   }
