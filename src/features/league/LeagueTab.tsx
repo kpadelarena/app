@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { chipStyle } from "@/components/ui/chipStyle";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { EmptyHint } from "@/components/ui/EmptyHint";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
@@ -151,9 +152,14 @@ interface LeagueDetailProps {
 function LeagueDetail({ leagueId, tab, onTab, member, isAdmin, onBack, onDelete, onOpenAuth }: LeagueDetailProps) {
   const lg = useLeague(leagueId, member?.id ?? null);
   const { league } = lg;
+  const confirmDialog = useConfirm();
 
-  const remove = () => {
-    if (!confirm("이벤트를 삭제할까요? 선수 · 대진표 · 순위가 함께 삭제돼요.")) return;
+  const remove = async () => {
+    const ok = await confirmDialog("이벤트를 삭제할까요? 선수 · 대진표 · 순위가 함께 삭제돼요.", {
+      confirmLabel: "삭제",
+      danger: true,
+    });
+    if (!ok) return;
     onDelete();
     onBack();
   };

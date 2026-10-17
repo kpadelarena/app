@@ -15,8 +15,16 @@ cp .env.local.example .env.local   # 로컬 Supabase 주소와 키가 들어 있
 pnpm dev
 ```
 
-http://localhost:3000 에서 확인. 개발용 로그인 계정은
-[`supabase/seed.sql`](./supabase/seed.sql) 맨 위에 적혀 있습니다.
+http://localhost:3000 에서 확인. 개발용 로그인(비밀번호는 모두 `padel-dev1`):
+
+| 이메일               | 역할   |
+| -------------------- | ------ |
+| `owner@example.com`  | 운영자 |
+| `admin@example.com`  | 관리자 |
+| `member@example.com` | 회원   |
+| `guest@example.com`  | 회원   |
+
+계정은 [`supabase/seed.sql`](./supabase/seed.sql)에서 만들어집니다.
 
 | 명령             | 설명                                                                                                                      |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------- |

@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 
 export function Providers({ children }: { children: ReactNode }) {
   // One client per browser tab, created once.
@@ -14,5 +15,9 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <ConfirmProvider>{children}</ConfirmProvider>
+    </QueryClientProvider>
+  );
 }

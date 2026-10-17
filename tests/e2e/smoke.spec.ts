@@ -54,8 +54,8 @@ test("the owner can book a free court slot and see it in their schedule", async 
   await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
 
   // As an admin, delete the booking from the open sheet; the grid is free again.
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "예약 삭제" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "삭제" }).click();
   await expect(page).toHaveURL(/\/schedule$/);
   await page.getByRole("button", { name: "코트 예약" }).click();
   await pickLastDay(page);
@@ -88,8 +88,8 @@ test("the owner can run a league event: create, add players, generate a schedule
   await page.getByRole("button", { name: "대진표", exact: true }).click();
   await expect(page.getByText("ROUND 1")).toBeVisible();
 
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "이벤트 삭제" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "삭제" }).click();
   await expect(page.getByText("리그 이벤트", { exact: true })).toBeVisible();
   await expect(page.getByText(name)).toHaveCount(0);
 });
@@ -108,8 +108,8 @@ test("the owner can add a venue with a court and delete it again", async ({ page
   await page.getByRole("button", { name: "코트 추가" }).click();
   await expect(page.getByRole("button", { name: "코트 1 숨기기" })).toBeVisible();
 
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "지점 삭제" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "삭제" }).click();
   await expect(page.getByRole("combobox").first()).not.toContainText(name);
 });
 

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { ChevronRight } from "lucide-react";
 import { EmptyHint } from "@/components/ui/EmptyHint";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -76,6 +77,7 @@ export function MyScheduleTab({
   onOpenMatch,
   onOpenAuth,
 }: MyScheduleTabProps) {
+  const confirmDialog = useConfirm();
   const { data: bookings } = useQuery({
     queryKey: queryKeys.myBookings.forMember(member?.id ?? ""),
     queryFn: () => getMyBookings(member!.id, new Date()),
@@ -184,7 +186,13 @@ export function MyScheduleTab({
                   </span>
                   {(isAdmin || changesOpen(b.startsAt)) && (
                     <button
-                      onClick={() => onLeave(b.participantId)}
+                      onClick={async () => {
+                        const ok = await confirmDialog(
+                          `${b.venueName} 코트 ${b.courtName} 예약 참여를 취소할까요? 마지막 참여자가 나가면 예약도 삭제돼요.`,
+                          { confirmLabel: "참여 취소", danger: true },
+                        );
+                        if (ok) onLeave(b.participantId);
+                      }}
                       style={{
                         background: "none",
                         border: "1px solid rgba(0,0,0,0.15)",
