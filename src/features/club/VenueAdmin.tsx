@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -66,19 +67,40 @@ export function NewVenueForm({ onCreate }: NewVenueFormProps) {
   );
 }
 
+/* The "+ 지점" sheet: creates the venue and hands back its id so the app
+   can switch to it. */
+export function NewVenueSheet({ onCreate, onClose }: NewVenueFormProps & { onClose: () => void }) {
+  return (
+    <BottomSheet header={<Eyebrow>새 지점</Eyebrow>} headerAlign="center" onClose={onClose}>
+      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontSize: 13, color: dim }}>
+          이름만 있으면 만들 수 있어요. 운영 시간, 코트, 편의시설은 만든 뒤 지점 설정에서 정해요.
+        </div>
+        <NewVenueForm
+          onCreate={async (input) => {
+            const id = await onCreate(input);
+            if (id) onClose();
+            return id;
+          }}
+        />
+      </div>
+    </BottomSheet>
+  );
+}
+
 interface VenueAdminProps {
   venue: Venue;
   onUpdate: (patch: VenuePatch) => void;
   onDelete: () => void;
   onAddCourt: (name: string) => void;
   onRemoveCourt: (courtId: string) => void;
-  onCreate: NewVenueFormProps["onCreate"];
 }
 
 /* Admin-only settings for the venue on screen: details, hours, capacity,
-   courts, plus adding another venue or deleting this one. */
-export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCourt, onCreate }: VenueAdminProps) {
-  const [open, setOpen] = useState(false);
+   courts, and deleting the venue. Opens by itself for a venue that has no
+   courts yet, which is where a freshly created one lands. */
+export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCourt }: VenueAdminProps) {
+  const [open, setOpen] = useState(venue.courts.length === 0);
   const [name, setName] = useState(venue.name);
   const [address, setAddress] = useState(venue.address ?? "");
   const [courtName, setCourtName] = useState("");
@@ -222,11 +244,6 @@ export function VenueAdmin({ venue, onUpdate, onDelete, onAddCourt, onRemoveCour
             {venue.courts.length === 0 && (
               <div style={{ fontSize: 12, color: dim, marginTop: 8 }}>코트를 추가해야 예약을 받을 수 있어요.</div>
             )}
-          </div>
-
-          <div>
-            <div style={labelStyle}>새 지점</div>
-            <NewVenueForm onCreate={onCreate} />
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>

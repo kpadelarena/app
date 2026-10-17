@@ -14,7 +14,7 @@ import { MyScheduleTab } from "@/features/league/MyScheduleTab";
 import { C, FONT } from "@/styles/tokens";
 import { ClubHeader } from "./ClubHeader";
 import { useVenues } from "./useVenues";
-import { NewVenueForm, VenueAdmin } from "./VenueAdmin";
+import { NewVenueForm, NewVenueSheet, VenueAdmin } from "./VenueAdmin";
 import { VenueInfo } from "./VenueInfo";
 
 const TABS = [
@@ -34,6 +34,7 @@ export function ClubApp() {
   const club = useVenues(session.member?.id ?? null);
   const [tab, setTab] = useState<TabKey>("booking");
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [addingVenue, setAddingVenue] = useState(false);
 
   const openAuth = () => setAuthModalOpen(true);
   const authModal = authModalOpen && (
@@ -78,6 +79,7 @@ export function ClubApp() {
         venues={club.venues}
         venueId={venue.id}
         onSelectVenue={club.selectVenue}
+        onAddVenue={session.isAdmin ? () => setAddingVenue(true) : undefined}
         account={<AccountButton member={session.member} onClick={openAuth} />}
         tabs={<TabBar tabs={TABS} active={tab} onChange={setTab} />}
       />
@@ -104,7 +106,6 @@ export function ClubApp() {
                 onDelete={club.deleteVenue}
                 onAddCourt={club.addCourt}
                 onRemoveCourt={club.removeCourt}
-                onCreate={club.createVenue}
               />
             )}
             <BookingTab
@@ -157,6 +158,17 @@ export function ClubApp() {
         )}
       </div>
 
+      {addingVenue && (
+        <NewVenueSheet
+          onCreate={async (input) => {
+            // createVenue switches to the new venue; land on its booking tab with settings open.
+            const id = await club.createVenue(input);
+            if (id) setTab("booking");
+            return id;
+          }}
+          onClose={() => setAddingVenue(false)}
+        />
+      )}
       {authModal}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Share2 } from "lucide-react";
+import { ChevronDown, Plus, Share2 } from "lucide-react";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import type { Venue } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
@@ -95,6 +95,8 @@ interface ClubHeaderProps {
   venues: Venue[];
   venueId: string;
   onSelectVenue: (id: string) => void;
+  /** Admins only: shows the "+ 지점" button beside the switcher. */
+  onAddVenue?: () => void;
   /** Shown at the right of the venue row. */
   account: ReactNode;
   /** Shown along the bottom edge. */
@@ -102,7 +104,7 @@ interface ClubHeaderProps {
 }
 
 /* The dark page header: brand, club name, venue switcher, account button and tabs. */
-export function ClubHeader({ venues, venueId, onSelectVenue, account, tabs }: ClubHeaderProps) {
+export function ClubHeader({ venues, venueId, onSelectVenue, onAddVenue, account, tabs }: ClubHeaderProps) {
   return (
     <div style={{ background: C.ink, color: "#fff", padding: "20px 20px 0" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -134,6 +136,29 @@ export function ClubHeader({ venues, venueId, onSelectVenue, account, tabs }: Cl
 
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
           <VenueSelect venues={venues} value={venueId} onChange={onSelectVenue} />
+          {onAddVenue && (
+            <button
+              onClick={onAddVenue}
+              aria-label="지점 추가"
+              title="지점 추가"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: `1px solid ${C.glass}`,
+                background: "transparent",
+                color: "rgba(255,255,255,0.75)",
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: FONT.body,
+                cursor: "pointer",
+              }}
+            >
+              <Plus size={13} /> 지점
+            </button>
+          )}
           <div style={{ flex: 1 }} />
           {account}
         </div>
