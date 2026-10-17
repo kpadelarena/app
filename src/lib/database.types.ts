@@ -398,6 +398,7 @@ export type Database = {
           name: string;
           open_time: string;
           photo_url: string | null;
+          slug: string;
           sort_order: number;
           timezone: string;
         };
@@ -411,6 +412,7 @@ export type Database = {
           name: string;
           open_time?: string;
           photo_url?: string | null;
+          slug: string;
           sort_order?: number;
           timezone?: string;
         };
@@ -424,6 +426,7 @@ export type Database = {
           name?: string;
           open_time?: string;
           photo_url?: string | null;
+          slug?: string;
           sort_order?: number;
           timezone?: string;
         };

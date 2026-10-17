@@ -100,6 +100,7 @@ test("the owner can add a venue with a court and delete it again", async ({ page
 
   const name = `E2E 지점 ${Date.now()}`;
   await page.getByPlaceholder("예: Yongsan Mmove").fill(name);
+  await page.getByPlaceholder("yongsan", { exact: true }).fill(`e2e-${Date.now()}`);
   await page.getByRole("button", { name: "지점 추가" }).last().click();
   await expect(page.getByRole("combobox").first()).toContainText(name);
 
@@ -210,7 +211,7 @@ test("a signed-in member can change their password from the profile card", async
 
 test("the venue, tab, league event and account sheet live in the URL", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/venues\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/venues\/[a-z0-9-]+$/);
   const base = new URL(page.url()).pathname;
 
   await page.getByRole("button", { name: "리그" }).click();
