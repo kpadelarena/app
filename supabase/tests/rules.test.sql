@@ -3,7 +3,7 @@
 -- transaction that is rolled back at the end.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(35);
 
 -- Helpers to act as a signed-in user, or as a logged-out visitor.
 create function pg_temp.login(uid uuid) returns void language plpgsql as $$
@@ -20,6 +20,7 @@ end;
 $$;
 create function pg_temp.superuser() returns void language plpgsql as $$
 begin
+  perform set_config('request.jwt.claims', '', true); -- no signed-in user, like the SQL editor
   perform set_config('role', 'postgres', true);
 end;
 $$;
@@ -62,10 +63,30 @@ select is((select role from public.profiles where id = '00000000-0000-4000-8000-
   'with two owners, one can step down');
 -- From here: user 2 is the owner, user 1 and 3 are members.
 
+select pg_temp.login('00000000-0000-4000-8000-000000000001');
+update public.profiles set display_name = 'Hacked' where id = '00000000-0000-4000-8000-000000000003';
+select is((select display_name from public.profiles where id = '00000000-0000-4000-8000-000000000003'), 'third',
+  'a member cannot edit another member''s profile');
+select throws_ok(
+  $$ insert into public.profiles (id, display_name) values ('00000000-0000-4000-8000-000000000099', 'Fake') $$,
+  '42501', null, 'a member cannot insert a profile');
+select throws_ok(
+  $$ insert into public.venues (name) values ('Rogue Venue') $$,
+  '42501', null, 'a member cannot create a venue');
+
 -- Venues
 select pg_temp.superuser();
 insert into public.venues (id, name, max_players) values ('a0000000-0000-4000-8000-000000000001', 'Test Venue', 3);
 insert into public.courts (id, venue_id, name) values ('c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', '1');
+
+select pg_temp.superuser();
+update public.profiles set role = 'admin' where id = '00000000-0000-4000-8000-000000000003';
+select pg_temp.login('00000000-0000-4000-8000-000000000003');
+select throws_ok(
+  $$ update public.profiles set role = 'owner' where id = '00000000-0000-4000-8000-000000000003' $$,
+  'only an owner can change roles');
+select pg_temp.superuser();
+update public.profiles set role = 'member' where id = '00000000-0000-4000-8000-000000000003';
 
 -- Bookings: a member books a public match three days out
 select pg_temp.login('00000000-0000-4000-8000-000000000001');
@@ -85,6 +106,16 @@ select throws_ok(
      ('c0000000-0000-4000-8000-000000000001', now() + interval '5 days', now() + interval '5 days 1 hour', 'lesson',
       '00000000-0000-4000-8000-000000000001') $$,
   '42501', null, 'a member cannot create a lesson');
+select throws_ok(
+  $$ insert into public.bookings (court_id, starts_at, ends_at, created_by) values
+     ('c0000000-0000-4000-8000-000000000001', now() - interval '1 day', now() - interval '1 day' + interval '1 hour',
+      '00000000-0000-4000-8000-000000000001') $$,
+  '42501', null, 'a member cannot book in the past');
+select throws_ok(
+  $$ insert into public.bookings (court_id, starts_at, ends_at, created_by) values
+     ('c0000000-0000-4000-8000-000000000001', now() + interval '6 days', now() + interval '6 days 1 hour',
+      '00000000-0000-4000-8000-000000000003') $$,
+  '42501', null, 'a member cannot book on someone else''s behalf');
 
 -- Joining
 select pg_temp.login('00000000-0000-4000-8000-000000000003');
@@ -142,6 +173,14 @@ select pg_temp.anon();
 select is((select count(*)::int from public.bookings), 1, 'visitors can see booking times');
 select is((select count(*)::int from public.booking_participants), 0, 'visitors cannot see who is in a booking');
 select is((select count(*)::int from public.profiles), 0, 'visitors cannot see profiles');
+select throws_ok(
+  $$ select created_by from public.bookings $$,
+  '42501', null, 'visitors cannot see who made a booking');
+select throws_ok(
+  $$ insert into public.bookings (court_id, starts_at, ends_at) values
+     ('c0000000-0000-4000-8000-000000000001', now() + interval '7 days', now() + interval '7 days 1 hour') $$,
+  '42501', null, 'visitors cannot book');
+select is((select count(*)::int from public.venues), 1, 'visitors can see venues');
 
 -- League scores
 select pg_temp.superuser();
@@ -155,6 +194,9 @@ insert into public.matches (id, league_id, round_number, court_number, side_a, s
    '{e0000000-0000-4000-8000-000000000001}', '{e0000000-0000-4000-8000-000000000003}');
 
 select pg_temp.login('00000000-0000-4000-8000-000000000001');
+select throws_ok(
+  $$ insert into public.league_players (league_id, guest_name) values ('d0000000-0000-4000-8000-000000000001', 'Ringer') $$,
+  '42501', null, 'a member cannot add players to a league');
 update public.matches set score_a = 21, score_b = 15 where id = 'f0000000-0000-4000-8000-000000000001';
 select is((select score_a from public.matches where id = 'f0000000-0000-4000-8000-000000000001'), 21,
   'a player in the match can enter the score');

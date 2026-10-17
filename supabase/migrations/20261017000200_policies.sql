@@ -185,10 +185,19 @@ alter table public.bookings enable row level security;
 
 create policy "bookings_select_all" on public.bookings for select to anon, authenticated using (true);
 
--- Members book matches in the future; lessons and league slots are admin-only.
+-- Logged-out visitors see when courts are taken, but not by whom.
+revoke select on public.bookings from anon;
+grant select (id, court_id, starts_at, ends_at, kind, visibility, league_id) on public.bookings to anon;
+
+-- Members book matches in the future; lessons, league slots and anything
+-- tied to a league are admin-only.
 create policy "bookings_insert_members" on public.bookings
   for insert to authenticated
-  with check (created_by = auth.uid() and starts_at > now() and (kind = 'match' or public.is_admin()));
+  with check (
+    created_by = auth.uid()
+    and starts_at > now()
+    and (public.is_admin() or (kind = 'match' and league_id is null))
+  );
 
 -- Members change a booking by joining or leaving it (below); only admins
 -- edit or delete the booking itself. An empty booking deletes itself.

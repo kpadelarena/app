@@ -7,11 +7,11 @@
 --   result-photos/{league id}/... admins
 -- =====================================================================
 
-insert into storage.buckets (id, name, public)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
-  ('avatars', 'avatars', true),
-  ('venue-photos', 'venue-photos', true),
-  ('result-photos', 'result-photos', true)
+  ('avatars', 'avatars', true, 5242880, '{image/jpeg,image/png,image/webp}'),
+  ('venue-photos', 'venue-photos', true, 5242880, '{image/jpeg,image/png,image/webp}'),
+  ('result-photos', 'result-photos', true, 5242880, '{image/jpeg,image/png,image/webp}')
 on conflict (id) do nothing;
 
 create policy "avatars_write_own_folder" on storage.objects

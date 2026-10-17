@@ -18,11 +18,15 @@ create type public.league_format as enum ('americano', 'mexicano', 'round_robin'
 -- very first account becomes the owner; everyone after is a member
 -- until an owner changes their role. There can be several owners, and
 -- the last one can never be demoted or deleted.
+--
+-- Every signed-in member can read every profile (it is the member
+-- list), so nothing private belongs here. Email lives only in auth.users
+-- and is read from the session; contact details would need their own
+-- table with self/admin-only access.
 -- ---------------------------------------------------------------------
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
-  phone text,
   level numeric(2, 1) not null default 3.0 check (level between 0 and 7),
   photo_url text,
   role public.member_role not null default 'member',
