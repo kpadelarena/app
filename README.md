@@ -24,6 +24,7 @@ http://localhost:3000 에서 확인. 개발용 로그인 계정은
 | `pnpm db:types`  | DB 스키마에서 `src/lib/database.types.ts`를 다시 생성                                                                     |
 | `pnpm db:stop`   | 로컬 Supabase 중지                                                                                                        |
 | `pnpm test`      | 단위 테스트 (Vitest)                                                                                                      |
+| `pnpm test:db`   | 데이터베이스 규칙 테스트 (pgTAP, `supabase/tests/`). 로컬 Supabase가 떠 있어야 함                                         |
 | `pnpm test:e2e`  | E2E 스모크 테스트 (Playwright). 로컬 Supabase가 떠 있어야 하며, 처음 한 번은 `pnpm exec playwright install chromium` 필요 |
 | `pnpm typecheck` | 타입 검사                                                                                                                 |
 | `pnpm lint`      | ESLint                                                                                                                    |
@@ -33,10 +34,17 @@ http://localhost:3000 에서 확인. 개발용 로그인 계정은
 
 ### 스키마 변경
 
-1. `pnpm supabase migration new <이름>` 으로 `supabase/migrations/`에 새 파일을
-   만들고 SQL을 작성합니다.
-2. `pnpm db:reset` 으로 로컬 DB에 처음부터 다시 적용해 확인합니다.
+스키마는 `supabase/migrations/`의 SQL 파일(Supabase CLI 마이그레이션)로만
+관리합니다. 테이블뿐 아니라 RLS 정책, 트리거, 함수도 모두 여기에 있습니다.
+
+1. `pnpm supabase migration new <이름>` 으로 새 파일을 만들고 SQL을 작성합니다.
+   (Studio에서 바꾼 뒤 `pnpm supabase db diff -f <이름>` 으로 생성해도 됩니다.)
+2. `pnpm db:reset` 으로 로컬 DB에 처음부터 다시 적용해 확인하고, 규칙이 바뀌었으면
+   `supabase/tests/`의 테스트도 고칩니다 (`pnpm test:db`).
 3. `pnpm db:types` 로 타입을 다시 생성해 함께 커밋합니다.
+
+아직 배포된 DB가 없으므로 지금은 기존 파일을 직접 고칩니다. 첫 배포 이후에는
+이미 적용된 파일은 절대 수정하지 말고 새 파일을 추가해야 합니다.
 
 ## 배포 설정
 
