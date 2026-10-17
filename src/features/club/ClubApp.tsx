@@ -13,6 +13,7 @@ import { MyScheduleTab } from "@/features/league/MyScheduleTab";
 import { C, FONT } from "@/styles/tokens";
 import { ClubHeader } from "./ClubHeader";
 import { useVenues } from "./useVenues";
+import { NewVenueForm, VenueAdmin } from "./VenueAdmin";
 import { VenueInfo } from "./VenueInfo";
 
 const TABS = [
@@ -54,9 +55,13 @@ export function ClubApp() {
     return (
       <CenteredScreen>
         <div>아직 등록된 지점이 없어요.</div>
-        <div style={{ fontSize: 13, color: "rgba(27,36,34,0.55)" }}>
-          관리자가 지점과 코트를 등록하면 여기에 표시돼요.
-        </div>
+        {session.isAdmin ? (
+          <NewVenueForm onCreate={club.createVenue} />
+        ) : (
+          <div style={{ fontSize: 13, color: "rgba(27,36,34,0.55)" }}>
+            관리자가 지점과 코트를 등록하면 여기에 표시돼요.
+          </div>
+        )}
         <AccountButton member={session.member} onClick={openAuth} />
         {authModal}
       </CenteredScreen>
@@ -87,6 +92,17 @@ export function ClubApp() {
               onSetPhotoUrl={club.setVenuePhotoUrl}
               onToggleAmenity={club.toggleAmenity}
             />
+            {session.isAdmin && (
+              <VenueAdmin
+                key={venue.id}
+                venue={venue}
+                onUpdate={club.updateVenue}
+                onDelete={club.deleteVenue}
+                onAddCourt={club.addCourt}
+                onRemoveCourt={club.removeCourt}
+                onCreate={club.createVenue}
+              />
+            )}
             <BookingTab
               venue={venue}
               bookings={club.bookings}

@@ -114,16 +114,65 @@ export async function getVenues(): Promise<Venue[]> {
   return data.map(toVenue);
 }
 
+export interface NewVenue {
+  name: string;
+  address: string | null;
+  sortOrder: number;
+}
+
+/* Admins only. Hours, capacity and timezone take the schema defaults.
+   Resolves to the new venue's id. */
+export async function createVenue({ name, address, sortOrder }: NewVenue) {
+  const { data, error } = await supabase
+    .from("venues")
+    .insert({ name, address, sort_order: sortOrder })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 export interface VenuePatch {
+  name?: string;
+  address?: string | null;
+  /** "HH:MM" at the venue. */
+  openTime?: string;
+  closeTime?: string;
+  maxPlayers?: number;
   amenities?: Amenities;
   photoUrl?: string;
 }
 
 export async function updateVenue(venueId: string, patch: VenuePatch) {
   const row: TablesUpdate<"venues"> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.address !== undefined) row.address = patch.address;
+  if (patch.openTime !== undefined) row.open_time = patch.openTime;
+  if (patch.closeTime !== undefined) row.close_time = patch.closeTime;
+  if (patch.maxPlayers !== undefined) row.max_players = patch.maxPlayers;
   if (patch.amenities !== undefined) row.amenities = patch.amenities;
   if (patch.photoUrl !== undefined) row.photo_url = patch.photoUrl;
   const { error } = await supabase.from("venues").update(row).eq("id", venueId);
+  if (error) throw error;
+}
+
+/* Courts and bookings go with it; refused while league events exist. */
+export async function deleteVenue(venueId: string) {
+  const { error } = await supabase.from("venues").delete().eq("id", venueId);
+  if (error) throw error;
+}
+
+/* A hidden court with the same name comes back instead of a duplicate. */
+export async function addCourt(venueId: string, name: string, sortOrder: number) {
+  const { error } = await supabase
+    .from("courts")
+    .upsert({ venue_id: venueId, name, sort_order: sortOrder, active: true }, { onConflict: "venue_id,name" });
+  if (error) throw error;
+}
+
+/* Hides the court; its past bookings stay on record. */
+export async function removeCourt(courtId: string) {
+  const { error } = await supabase.from("courts").update({ active: false }).eq("id", courtId);
   if (error) throw error;
 }
 

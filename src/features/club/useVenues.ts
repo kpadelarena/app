@@ -3,11 +3,15 @@ import { useEffect, useState } from "react";
 import { DAYS_AHEAD } from "@/features/booking/constants";
 import { addHours, toInstant, zonedDate } from "@/features/booking/slots";
 import {
+  addCourt,
   addParticipant,
   createBooking,
+  createVenue,
   deleteBooking,
+  deleteVenue,
   getBookings,
   getVenues,
+  removeCourt,
   removeParticipant,
   subscribeToChanges,
   updateBooking,
@@ -15,6 +19,8 @@ import {
   uploadVenuePhoto,
   type BookingPatch,
   type NewBooking,
+  type NewVenue,
+  type VenuePatch,
   type Who,
 } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
@@ -82,7 +88,11 @@ export function useVenues(memberId: string | null) {
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => setSaveError(false),
     onError: () => setSaveError(true),
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: queryKeys.venues }),
+    // Courts changing also changes which bookings are on screen.
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+    },
   });
 
   return {
@@ -102,6 +112,27 @@ export function useVenues(memberId: string | null) {
     updateBooking: (bookingId: string, patch: BookingPatch) =>
       bookingWrite.mutate(() => updateBooking(bookingId, patch)),
     deleteBooking: (bookingId: string) => bookingWrite.mutate(() => deleteBooking(bookingId)),
+
+    /* Admins only. Shows the new venue once created; resolves to null on failure. */
+    createVenue: async (input: Omit<NewVenue, "sortOrder">) => {
+      try {
+        const id = (await venueWrite.mutateAsync(() =>
+          createVenue({ ...input, sortOrder: venues.length + 1 }),
+        )) as string;
+        setVenueId(id);
+        return id;
+      } catch {
+        return null;
+      }
+    },
+    updateVenue: (patch: VenuePatch) => {
+      if (!venue) return;
+      patchVenue(patch);
+      venueWrite.mutate(() => updateVenue(venue.id, patch));
+    },
+    deleteVenue: () => venue && venueWrite.mutate(() => deleteVenue(venue.id)),
+    addCourt: (name: string) => venue && venueWrite.mutate(() => addCourt(venue.id, name, venue.courts.length + 1)),
+    removeCourt: (courtId: string) => venueWrite.mutate(() => removeCourt(courtId)),
 
     toggleAmenity: (key: string) => {
       if (!venue) return;

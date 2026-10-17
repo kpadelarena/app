@@ -88,3 +88,22 @@ test("the owner can run a league event: create, add players, generate a schedule
   await expect(page.getByText("리그 이벤트", { exact: true })).toBeVisible();
   await expect(page.getByText(name)).toHaveCount(0);
 });
+
+test("the owner can add a venue with a court and delete it again", async ({ page }) => {
+  await logIn(page, OWNER);
+  await page.getByRole("button", { name: "지점 설정" }).click();
+
+  const name = `E2E 지점 ${Date.now()}`;
+  await page.getByPlaceholder("예: Yongsan Mmove").fill(name);
+  await page.getByRole("button", { name: "지점 추가" }).click();
+  await expect(page.getByRole("combobox").first()).toContainText(name);
+
+  // The new venue has no courts yet; add one with the default name.
+  await page.getByRole("button", { name: "지점 설정" }).click();
+  await page.getByRole("button", { name: "코트 추가" }).click();
+  await expect(page.getByRole("button", { name: "코트 1 숨기기" })).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "지점 삭제" }).click();
+  await expect(page.getByRole("combobox").first()).not.toContainText(name);
+});
