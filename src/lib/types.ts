@@ -77,3 +77,21 @@ export interface Participant {
   profileId?: string | null;
   name: string;
 }
+
+/** Everything the UI shows for the club: its settings plus the loaded
+ *  players, schedule and bookings. */
+export interface League {
+  id: string;
+  name: string;
+  venue: string;
+  format: LeagueFormat;
+  courtCount: number;
+  amenities: Amenities;
+  photo: string | null;
+  resultPhoto: string | null;
+  players: Player[];
+  teams: Team[];
+  rounds: Round[];
+  bookings: Booking[];
+  createdAt: string;
+}
