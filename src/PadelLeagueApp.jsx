@@ -60,28 +60,11 @@ import { EmptyHint } from "./components/ui/EmptyHint";
 import { Th, Td } from "./components/ui/Table";
 import { PhotoInput } from "./components/ui/PhotoInput";
 import { AuthModal } from "./features/auth/AuthModal";
+import { BookingTab } from "./features/booking/BookingTab";
+import { BOOKING_SLOTS_PER_MATCH, categoryOf } from "./features/booking/constants";
+import { VENUES } from "./features/club/constants";
+import { VenueInfo } from "./features/club/VenueInfo";
 
-
-const VENUES = ["Yongsan Mmove", "Gimpo Padel Society", "Dongtan Garros Padel"];
-
-const CATEGORIES = [
-  { key: "rental", label: "대관", color: "#8B5CF6" },
-  { key: "match", label: "매치", color: "#16A34A" },
-  { key: "league", label: "리그매치", color: "#D97706" },
-  { key: "lesson", label: "레슨", color: "#E4574B" },
-];
-const categoryOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
-
-const AMENITIES = [
-  { key: "parking", label: "주차" },
-  { key: "lockerRoom", label: "탈의실" },
-  { key: "shower", label: "샤워시설" },
-  { key: "restroom", label: "화장실" },
-  { key: "racketRental", label: "라켓대여" },
-  { key: "wifi", label: "와이파이" },
-];
-
-const BOOKING_SLOTS_PER_MATCH = 4;
 
 /* ---------------------------------------------------------
    코트 다이어그램 매치 카드 — 시그니처 요소
@@ -333,7 +316,7 @@ export default function PadelLeagueApp() {
      Photos — club banner, result photo, profile avatar
   --------------------------------------------------------------- */
   const uploadVenuePhoto = useCallback(
-    async (_venue, file) => {
+    async (file) => {
       if (!league) return;
       setPhotoUploading(true);
       setPhotoError("");
@@ -352,7 +335,7 @@ export default function PadelLeagueApp() {
   );
 
   const setVenuePhotoUrl = useCallback(
-    async (_venue, url) => {
+    async (url) => {
       if (!league) return;
       setLeague((prev) => ({ ...prev, photo: url }));
       try {
@@ -365,7 +348,7 @@ export default function PadelLeagueApp() {
   );
 
   const toggleVenueAmenity = useCallback(
-    async (_venue, key) => {
+    async (key) => {
       if (!league) return;
       const next = { ...(league.amenities || {}), [key]: !league.amenities?.[key] };
       setLeague((prev) => ({ ...prev, amenities: next }));
@@ -790,9 +773,6 @@ export default function PadelLeagueApp() {
     }
   };
 
-  const venuePhotos = { [league.venue]: league.photo };
-  const venueAmenities = { [league.venue]: league.amenities };
-
   const tabs = [
     { key: "booking", label: "코트 예약", icon: Grid3x3 },
     { key: "myschedule", label: "내 일정", icon: UserCircle },
@@ -1008,18 +988,25 @@ export default function PadelLeagueApp() {
       {/* Content */}
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 20px 80px" }}>
         {tab === "booking" && (
-          <BookingTab
-            league={league}
-            onJoinSlot={handleJoinSlot}
-            onRemoveParticipant={handleRemoveParticipant}
-            venuePhotos={venuePhotos}
-            onUploadPhoto={uploadVenuePhoto}
-            onSetPhotoUrl={setVenuePhotoUrl}
-            photoUploading={photoUploading}
-            photoError={photoError}
-            venueAmenities={venueAmenities}
-            onToggleAmenity={toggleVenueAmenity}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <VenueInfo
+              venue={league.venue}
+              photo={league.photo}
+              amenities={league.amenities}
+              photoUploading={photoUploading}
+              photoError={photoError}
+              onUploadPhoto={uploadVenuePhoto}
+              onSetPhotoUrl={setVenuePhotoUrl}
+              onToggleAmenity={toggleVenueAmenity}
+            />
+            <BookingTab
+              bookings={league.bookings}
+              players={league.players}
+              courtCount={league.courtCount}
+              onJoinSlot={handleJoinSlot}
+              onRemoveParticipant={handleRemoveParticipant}
+            />
+          </div>
         )}
 
         {tab === "myschedule" && (
@@ -1337,598 +1324,6 @@ function CourtStepper({ value, onChange }) {
       >
         +
       </button>
-    </div>
-  );
-}
-
-function BookingTab({
-  league,
-  onJoinSlot,
-  onRemoveParticipant,
-  venuePhotos,
-  onUploadPhoto,
-  onSetPhotoUrl,
-  photoUploading,
-  photoError,
-  venueAmenities,
-  onToggleAmenity,
-}) {
-  const days = useMemo(() => nextDays(7), []);
-  const [selectedDate, setSelectedDate] = useState(days[0].iso);
-  const [activeSlot, setActiveSlot] = useState(null); // { date, time, court }
-  const [joinPlayerId, setJoinPlayerId] = useState("");
-  const [guestName, setGuestName] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0].key);
-  const [duration, setDuration] = useState(1);
-
-  const findBooking = (date, time, court) =>
-    (league.bookings || []).find(
-      (b) => b.venue === league.venue && b.date === date && b.time === time && b.court === court
-    );
-
-  const availableDurations = (date, court, time) => {
-    const startIdx = TIME_SLOTS.indexOf(time);
-    const out = [];
-    for (let d = 1; d <= 3; d++) {
-      const endIdx = startIdx + d - 1;
-      if (endIdx > TIME_SLOTS.length - 1) break;
-      let ok = true;
-      for (let k = 0; k < d; k++) {
-        if (findBooking(date, TIME_SLOTS[startIdx + k], court)) {
-          ok = false;
-          break;
-        }
-      }
-      if (ok) out.push(d);
-      else break;
-    }
-    return out.length ? out : [1];
-  };
-
-  const openSlot = (date, time, court) => {
-    const existing = findBooking(date, time, court);
-    setActiveSlot({ date, time, court });
-    setJoinPlayerId(league.players[0]?.id || "");
-    setGuestName("");
-    setCategory(existing ? existing.category : CATEGORIES[0].key);
-    setDuration(1);
-  };
-
-  const closeModal = () => setActiveSlot(null);
-
-  const joinSlot = () => {
-    if (!activeSlot) return;
-    const chosenPlayer = league.players.find((p) => p.id === joinPlayerId);
-    const name = guestName.trim() || chosenPlayer?.name;
-    if (!name) return;
-    const { date, time, court } = activeSlot;
-    const existing = findBooking(date, time, court);
-    const participant = { profileId: guestName.trim() ? null : chosenPlayer?.id, name };
-
-    onJoinSlot({ date, time, court, category, duration, existing }, participant);
-    setGuestName("");
-    setJoinPlayerId(league.players[0]?.id || "");
-  };
-
-  const removeParticipant = (participantId) => {
-    if (!activeSlot) return;
-    const { date, time, court } = activeSlot;
-    const existing = findBooking(date, time, court);
-    if (!existing) return;
-    onRemoveParticipant(existing, participantId);
-  };
-
-  const courts = Array.from({ length: league.courtCount }, (_, i) => i + 1);
-  const activeBooking = activeSlot && findBooking(activeSlot.date, activeSlot.time, activeSlot.court);
-  const photo = venuePhotos?.[league.venue];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div
-        style={{
-          position: "relative",
-          height: 140,
-          borderRadius: 16,
-          overflow: "hidden",
-          background: photo ? `#000` : `linear-gradient(135deg, ${C.turf}, ${C.ink})`,
-        }}
-      >
-        {photo ? (
-          <img
-            src={photo}
-            alt={league.venue}
-            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }}
-          />
-        ) : (
-          <CourtWatermark />
-        )}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.55))",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            padding: 14,
-          }}
-        >
-          <Eyebrow>{league.venue}</Eyebrow>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <PhotoInput
-              label={photo ? "사진 교체" : "사진 추가"}
-              uploading={photoUploading}
-              onFile={(file) => onUploadPhoto(league.venue, file)}
-              onSetUrl={(url) => onSetPhotoUrl(league.venue, url)}
-              dark
-            />
-          </div>
-        </div>
-      </div>
-
-      {photoError && (
-        <div
-          style={{
-            fontSize: 12,
-            color: C.danger,
-            background: "rgba(194,84,80,0.08)",
-            border: `1px solid ${C.danger}`,
-            borderRadius: 10,
-            padding: "8px 12px",
-          }}
-        >
-          {photoError}
-        </div>
-      )}
-
-      <SectionCard>
-        <Eyebrow color={C.charcoal}>편의시설</Eyebrow>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-          {AMENITIES.map((a) => {
-            const active = !!venueAmenities?.[league.venue]?.[a.key];
-            return (
-              <button
-                key={a.key}
-                onClick={() => onToggleAmenity(league.venue, a.key)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: `1px solid ${active ? C.turf : "rgba(0,0,0,0.15)"}`,
-                  background: active ? C.turf : "transparent",
-                  color: active ? "#fff" : "rgba(27,36,34,0.5)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {active ? "✓ " : ""}
-                {a.label}
-              </button>
-            );
-          })}
-        </div>
-      </SectionCard>
-
-      <SectionCard>
-        <Eyebrow color={C.charcoal}>날짜선택</Eyebrow>
-        <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
-          {days.map((d) => (
-            <button
-              key={d.iso}
-              onClick={() => setSelectedDate(d.iso)}
-              style={{
-                flex: "0 0 auto",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                padding: "8px 14px",
-                borderRadius: 12,
-                border: `1px solid ${selectedDate === d.iso ? C.turf : "rgba(0,0,0,0.12)"}`,
-                background: selectedDate === d.iso ? C.turf : "#fff",
-                color: selectedDate === d.iso ? "#fff" : C.charcoal,
-                cursor: "pointer",
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>
-                {d.isToday ? "오늘" : d.weekday}
-              </span>
-              <span style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 14 }}>
-                {d.label}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", gap: 14, marginTop: 14, flexWrap: "wrap", fontSize: 12, color: "rgba(27,36,34,0.6)" }}>
-          <LegendDot color="#fff" border="rgba(0,0,0,0.2)" label="예약 가능" />
-          <LegendDot color="#D6E6FB" border="#7FA6E0" label="일부 예약 (참여 가능)" />
-          <LegendDot color="#3E6FD9" border="#3E6FD9" label="마감" />
-        </div>
-        <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap", fontSize: 12, color: "rgba(27,36,34,0.6)" }}>
-          {CATEGORIES.map((c) => (
-            <LegendDot key={c.key} color={c.color} border={c.color} label={c.label} />
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard>
-        <div style={{ overflowX: "auto" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `64px repeat(${courts.length}, minmax(96px, 1fr))`,
-              gap: 6,
-              minWidth: 64 + courts.length * 96,
-            }}
-          >
-            <div />
-            {courts.map((c) => (
-              <CourtHeaderCell key={c} court={c} />
-            ))}
-
-            {TIME_SLOTS.map((time) => (
-              <React.Fragment key={time}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    fontFamily: FONT.mono,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "rgba(27,36,34,0.6)",
-                  }}
-                >
-                  {time}
-                </div>
-                {courts.map((court) => {
-                  const booking = findBooking(selectedDate, time, court);
-                  return (
-                    <BookingCell
-                      key={court}
-                      booking={booking}
-                      onClick={() => openSlot(selectedDate, time, court)}
-                    />
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      </SectionCard>
-
-      {activeSlot && (
-        <JoinModal
-          slot={activeSlot}
-          booking={activeBooking}
-          players={league.players}
-          joinPlayerId={joinPlayerId}
-          setJoinPlayerId={setJoinPlayerId}
-          guestName={guestName}
-          setGuestName={setGuestName}
-          category={category}
-          setCategory={setCategory}
-          duration={duration}
-          setDuration={setDuration}
-          availableDurations={availableDurations(activeSlot.date, activeSlot.court, activeSlot.time)}
-          onJoin={joinSlot}
-          onRemove={removeParticipant}
-          onClose={closeModal}
-        />
-      )}
-    </div>
-  );
-}
-
-function CourtWatermark() {
-  return (
-    <svg
-      viewBox="0 0 200 120"
-      style={{ position: "absolute", right: -14, bottom: -22, width: 200, opacity: 0.14 }}
-    >
-      <rect x="10" y="10" width="180" height="100" rx="8" fill="none" stroke="white" strokeWidth="4" />
-      <line x1="100" y1="10" x2="100" y2="110" stroke="white" strokeWidth="3" strokeDasharray="6 6" />
-      <rect x="10" y="40" width="45" height="40" fill="none" stroke="white" strokeWidth="3" />
-      <rect x="145" y="40" width="45" height="40" fill="none" stroke="white" strokeWidth="3" />
-    </svg>
-  );
-}
-
-function CourtHeaderCell({ court }) {
-  return (
-    <div
-      style={{
-        textAlign: "center",
-        fontFamily: FONT.display,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        color: "rgba(27,36,34,0.6)",
-        padding: "4px 0",
-      }}
-    >
-      코트 {court}
-    </div>
-  );
-}
-
-function LegendDot({ color, border, label }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 4,
-          background: color,
-          border: `1px solid ${border}`,
-          display: "inline-block",
-        }}
-      />
-      {label}
-    </div>
-  );
-}
-
-function BookingCell({ booking, onClick }) {
-  const count = booking ? booking.players.length : 0;
-  const full = count >= BOOKING_SLOTS_PER_MATCH;
-  const empty = count === 0;
-  const cat = booking ? categoryOf(booking.category) : null;
-
-  const bg = empty ? "#fff" : full ? "#3E6FD9" : "#D6E6FB";
-  const border = empty ? "rgba(0,0,0,0.15)" : full ? "#3E6FD9" : "#7FA6E0";
-  const textColor = full ? "#fff" : C.charcoal;
-
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        height: 56,
-        borderRadius: 10,
-        border: `1px solid ${border}`,
-        background: bg,
-        color: textColor,
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 2,
-        padding: 4,
-      }}
-    >
-      <span style={{ fontSize: 11, fontWeight: 700 }}>
-        {empty ? "예약 가능" : full ? "마감" : `${BOOKING_SLOTS_PER_MATCH - count}자리 남음`}
-      </span>
-      {!empty && (
-        <span style={{ fontSize: 10, opacity: 0.85, fontFamily: FONT.mono }}>
-          {count}/{BOOKING_SLOTS_PER_MATCH}
-        </span>
-      )}
-      {cat && (
-        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 700 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: cat.color, display: "inline-block" }} />
-          {cat.label}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function JoinModal({
-  slot,
-  booking,
-  players,
-  joinPlayerId,
-  setJoinPlayerId,
-  guestName,
-  setGuestName,
-  category,
-  setCategory,
-  duration,
-  setDuration,
-  availableDurations,
-  onJoin,
-  onRemove,
-  onClose,
-}) {
-  const count = booking ? booking.players.length : 0;
-  const full = count >= BOOKING_SLOTS_PER_MATCH;
-  const isNewBooking = !booking;
-  const endTime = (() => {
-    const idx = TIME_SLOTS.indexOf(slot.time);
-    const endIdx = Math.min(idx + duration, TIME_SLOTS.length - 1);
-    return TIME_SLOTS[endIdx] || slot.time;
-  })();
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(16,21,26,0.55)",
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        zIndex: 50,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          background: "#fff",
-          borderRadius: "18px 18px 0 0",
-          padding: 20,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <Eyebrow>
-              {slot.date} · {slot.time}
-              {isNewBooking && duration > 1 ? ` – ${endTime}` : ""}
-            </Eyebrow>
-            <div style={{ fontFamily: FONT.display, fontSize: 20, fontWeight: 700, marginTop: 4 }}>
-              코트 {slot.court}
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
-            <X size={20} color={C.charcoal} />
-          </button>
-        </div>
-
-        {isNewBooking && (
-          <div style={{ marginTop: 14 }}>
-            <Eyebrow>예약 시간</Eyebrow>
-            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-              {[1, 2, 3].map((d) => {
-                const disabled = !availableDurations.includes(d);
-                const active = duration === d;
-                return (
-                  <button
-                    key={d}
-                    disabled={disabled}
-                    onClick={() => setDuration(d)}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 10,
-                      border: `1px solid ${active ? C.turf : "rgba(0,0,0,0.15)"}`,
-                      background: active ? C.turf : disabled ? "#F1F1EC" : "transparent",
-                      color: active ? "#fff" : disabled ? "rgba(0,0,0,0.3)" : C.charcoal,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: disabled ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {d}시간
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginTop: 14 }}>
-          {isNewBooking ? (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() => setCategory(c.key)}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    border: `1px solid ${category === c.key ? c.color : "rgba(0,0,0,0.15)"}`,
-                    background: category === c.key ? c.color : "transparent",
-                    color: category === c.key ? "#fff" : C.charcoal,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "5px 12px",
-                borderRadius: 999,
-                background: categoryOf(booking.category).color,
-                color: "#fff",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              {categoryOf(booking.category).label}
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-          {Array.from({ length: BOOKING_SLOTS_PER_MATCH }, (_, i) => {
-            const p = booking?.players[i];
-            return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  background: p ? C.paperDim : "transparent",
-                  border: p ? "none" : "1px dashed rgba(0,0,0,0.2)",
-                }}
-              >
-                <span style={{ fontSize: 14, fontWeight: p ? 700 : 500, color: p ? C.charcoal : "rgba(27,36,34,0.4)" }}>
-                  {p ? p.name : `빈 자리 ${i + 1}`}
-                </span>
-                {p && (
-                  <button
-                    onClick={() => onRemove(p.id)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(27,36,34,0.4)" }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {!full && (
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-            <Eyebrow>참여하기</Eyebrow>
-            {players.length > 0 && (
-              <select
-                value={joinPlayerId}
-                onChange={(e) => {
-                  setJoinPlayerId(e.target.value);
-                  setGuestName("");
-                }}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(0,0,0,0.15)",
-                  fontSize: 14,
-                }}
-              >
-                <option value="">등록된 선수 선택</option>
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
-              value={guestName}
-              onChange={(e) => {
-                setGuestName(e.target.value);
-                setJoinPlayerId("");
-              }}
-              placeholder="또는 이름 직접 입력 (게스트)"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid rgba(0,0,0,0.15)",
-                fontSize: 14,
-              }}
-            />
-            <PrimaryButton onClick={onJoin} icon={UserPlus}>
-              {isNewBooking ? "예약하기" : "이 시간에 참여"}
-            </PrimaryButton>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
