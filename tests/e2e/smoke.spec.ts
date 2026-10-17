@@ -4,11 +4,13 @@ import { expect, test, type Page } from "@playwright/test";
 const OWNER = { email: "owner@example.com", password: "padel-dev1", name: "관리자" };
 
 /* The last day in the picker, so every slot on it is in the future. */
-const pickLastDay = (page: Page) =>
-  page
+const pickLastDay = async (page: Page) => {
+  await page
     .getByRole("button", { name: /^(일|월|화|수|목|금|토) \d+\/\d+$/ })
     .last()
     .click();
+  await expect(page).toHaveURL(/\d{4}-\d{2}-\d{2}$/); // the day is in the URL once the grid switched
+};
 
 async function logIn(page: Page, who: { email: string; password: string; name: string }) {
   await page.goto("/");
@@ -53,6 +55,10 @@ test("the owner can book a free court slot and see it in their schedule", async 
     .getByRole("button", { name: /5자리 남음/ })
     .first()
     .click();
+  // The open booking is in the URL, so the sheet survives a reload and the link can be shared.
+  await expect(page).toHaveURL(/\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}$/);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
   await page.getByRole("button", { name: "예약 삭제" }).click();
   await expect(freeSlots).toHaveCount(before);
 });
@@ -155,7 +161,7 @@ async function resetPasswordTo(page: Page, password: string, previousLink: strin
   await page.getByPlaceholder("새 비밀번호", { exact: false }).first().fill(password);
   await page.getByPlaceholder("새 비밀번호 확인").fill(password);
   await page.getByRole("button", { name: "비밀번호 바꾸기" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/venues\//);
   await expect(page.getByText(MEMBER.name).first()).toBeVisible();
   return link;
 }
@@ -201,4 +207,44 @@ test("a signed-in member can change their password from the profile card", async
   await page.getByRole("button", { name: OWNER.name }).click();
   await changeTo(`temp-${Date.now()}`);
   await changeTo(OWNER.password);
+});
+
+test("the venue, tab, league event and account sheet live in the URL", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/venues\/[0-9a-f-]+$/);
+  const base = new URL(page.url()).pathname;
+
+  await page.getByRole("button", { name: "리그" }).click();
+  await expect(page).toHaveURL(`${base}/leagues`);
+  await page.getByRole("button", { name: "10월 아메리카노 나이트" }).click();
+  await expect(page).toHaveURL(/\/leagues\/[0-9a-f-]+$/);
+
+  // Club-wide tabs carry no venue; going back to a venue tab remembers the venue.
+  await page.getByRole("button", { name: "회원", exact: true }).click();
+  await expect(page).toHaveURL("/members");
+  await page.getByRole("button", { name: "코트 예약" }).click();
+  await expect(page).toHaveURL(base);
+
+  // Deep links render the right screen, and the account segment opens the sheet.
+  await page.goto("/account");
+  await expect(page.getByPlaceholder("이메일")).toBeVisible(); // the sign-in form, for a visitor
+  await page.goto("/members");
+  await page.getByRole("button", { name: "회원가입 · 로그인" }).first().click();
+  await expect(page).toHaveURL("/account");
+  await page.goBack();
+  await expect(page).toHaveURL("/members");
+  await page.goto("/schedule");
+  await expect(page.getByText("예약한 코트를 모아볼 수 있어요")).toBeVisible();
+
+  // An unknown venue id falls back to the default venue.
+  await page.goto("/venues/not-a-venue/leagues");
+  await expect(page).toHaveURL(`${base}/leagues`);
+
+  // Picking a day puts it in the URL; a day outside the week falls back to today.
+  await page.goto(base);
+  await pickLastDay(page);
+  await expect(page).toHaveURL(new RegExp(`${base}/\\d{4}-\\d{2}-\\d{2}$`));
+  await page.goto(`${base}/2020-01-01`);
+  await expect(page).toHaveURL(base);
+  await expect(page.getByRole("button", { name: /^오늘/ })).toBeVisible();
 });

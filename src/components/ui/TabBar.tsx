@@ -3,7 +3,8 @@ import { C, FONT } from "@/styles/tokens";
 
 interface TabBarProps<Key extends string> {
   tabs: readonly { key: Key; label: string; icon: LucideIcon }[];
-  active: Key;
+  /** Null when no tab applies, such as on the account page. */
+  active: Key | null;
   onChange: (key: Key) => void;
 }
 

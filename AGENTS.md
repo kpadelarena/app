@@ -120,9 +120,14 @@ confirmation stays on, Kakao login deferred.
   what a visitor may see depends on who they are.
 - `src/components/ui` — small shared pieces (BottomSheet, PrimaryButton,
   chipStyle, Eyebrow, SectionCard…). Reuse before adding.
-- `src/app` — App Router. The club app is fully client-rendered;
-  `/privacy` and `/terms` are static; `/reset-password` handles the
-  recovery link.
+- `src/app` — App Router. The club app is one client-rendered page
+  served by the `[[...path]]` catch-all; `src/features/club/routes.ts`
+  maps the URL to and from app state (venue, tab, league event, account
+  sheet), so anything a user can be looking at should be linkable. Venue
+  content lives under `/venues/<id>`; club-wide tabs (`/schedule`,
+  `/members`) carry no venue and the last venue shown is remembered. Add
+  new screens there, not as local `useState`. `/privacy` and `/terms`
+  are static; `/reset-password` handles the recovery link.
 - Shared validation (zod) lives in `src/features/auth/validation.ts`.
 
 ## Conventions

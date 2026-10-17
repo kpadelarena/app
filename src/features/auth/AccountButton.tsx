@@ -7,13 +7,15 @@ interface AccountButtonProps {
   onClick: () => void;
   /** Colours for the dark header (default) or a light page. */
   dark?: boolean;
+  /** On the account page the button reads like the active tab. */
+  active?: boolean;
 }
 
 /* The signed-in member's chip, or the sign-up / log-in call to action. */
-export function AccountButton({ member, onClick, dark = true }: AccountButtonProps) {
+export function AccountButton({ member, onClick, dark = true, active = false }: AccountButtonProps) {
   const accent = dark ? C.ball : C.turf;
-  const text = dark ? "#fff" : C.charcoal;
-  const line = dark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.15)";
+  const text = active ? accent : dark ? "#fff" : C.charcoal;
+  const line = active ? accent : dark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.15)";
 
   if (!member) {
     return (
@@ -23,7 +25,7 @@ export function AccountButton({ member, onClick, dark = true }: AccountButtonPro
           padding: "7px 14px",
           borderRadius: 999,
           border: `1px solid ${accent}`,
-          background: "transparent",
+          background: active ? (dark ? "rgba(215,241,59,0.12)" : "rgba(15,61,62,0.08)") : "transparent",
           color: accent,
           fontSize: 13,
           fontWeight: 700,

@@ -31,9 +31,8 @@ const PHOTO_ERROR = "사진 저장에 실패했어요. 권한이 있는 계정�
 /* The venues, the one on screen, and its bookings for the coming days.
    Writes go to the database and then invalidate what they changed; a
    failed write raises `saveError`. */
-export function useVenues(memberId: string | null) {
+export function useVenues(memberId: string | null, venueId: string | null) {
   const queryClient = useQueryClient();
-  const [venueId, setVenueId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState("");
@@ -99,11 +98,11 @@ export function useVenues(memberId: string | null) {
     venues,
     venue,
     bookings: bookingsQuery.data ?? [],
+    bookingsLoading: bookingsQuery.isPending,
     loading: venuesQuery.isPending,
     saveError,
     photoUploading,
     photoError,
-    selectVenue: setVenueId,
 
     createBooking: (input: NewBooking) => memberId && bookingWrite.mutate(() => createBooking(input, memberId)),
     joinBooking: (bookingId: string, who: Who) =>
@@ -113,14 +112,10 @@ export function useVenues(memberId: string | null) {
       bookingWrite.mutate(() => updateBooking(bookingId, patch)),
     deleteBooking: (bookingId: string) => bookingWrite.mutate(() => deleteBooking(bookingId)),
 
-    /* Admins only. Shows the new venue once created; resolves to null on failure. */
+    /* Admins only. Resolves to the new venue's id, or null on failure. */
     createVenue: async (input: Omit<NewVenue, "sortOrder">) => {
       try {
-        const id = (await venueWrite.mutateAsync(() =>
-          createVenue({ ...input, sortOrder: venues.length + 1 }),
-        )) as string;
-        setVenueId(id);
-        return id;
+        return (await venueWrite.mutateAsync(() => createVenue({ ...input, sortOrder: venues.length + 1 }))) as string;
       } catch {
         return null;
       }
