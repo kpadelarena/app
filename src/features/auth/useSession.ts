@@ -1,26 +1,15 @@
 import { useCallback, useRef, useState } from "react";
-import { getCurrentProfile, signInWithUsername, signOut, signUpWithUsername } from "@/lib/auth";
+import { getCurrentMember, signIn, signOut, signUp } from "@/lib/auth";
 import { setAvatarUrl, updateProfileLevel, uploadAvatar } from "@/lib/db";
-import type { Member, ProfileRow } from "@/lib/types";
+import type { Contact, Member } from "@/lib/types";
 import type { SignUpForm } from "./AuthModal";
 
-const toMember = (row: ProfileRow): Member => ({
-  id: row.id,
-  name: row.display_name,
-  username: row.username,
-  level: row.level ?? 3,
-  photo: row.photo_url,
-  region: row.region,
-  email: row.email,
-  phone: row.phone,
-  gender: row.gender,
-});
+export type AuthOutcome = { error: string } | { userId: string; signedIn: boolean };
 
-export type AuthOutcome = { error: string } | { userId: string };
-
-/* The signed-in member's profile, plus the actions that change it. */
+/* The signed-in member's profile and contact details, plus the actions that change them. */
 export function useSession() {
-  const [currentMember, setCurrentMember] = useState<Member | null>(null);
+  const [member, setMember] = useState<Member | null>(null);
+  const [contact, setContact] = useState<Contact | null>(null);
   const [profileUploading, setProfileUploading] = useState(false);
   // The id is also kept in a ref so that an action started right after
   // sign-up (uploading the chosen photo) sees the new account at once.
@@ -28,29 +17,36 @@ export function useSession() {
 
   /* Re-reads the profile from the current auth session; null when signed out. */
   const refresh = useCallback(async () => {
-    const profile = await getCurrentProfile();
-    const member = profile ? toMember(profile) : null;
-    memberId.current = member?.id ?? null;
-    setCurrentMember(member);
-    return member;
+    const current = await getCurrentMember();
+    memberId.current = current?.member.id ?? null;
+    setMember(current?.member ?? null);
+    setContact(current?.contact ?? null);
+    return current?.member ?? null;
   }, []);
 
-  const signUp = useCallback(
-    async ({ photo, ...form }: SignUpForm): Promise<AuthOutcome> => {
-      const result = await signUpWithUsername({ ...form, photoUrl: photo });
+  const register = useCallback(
+    async (form: SignUpForm): Promise<AuthOutcome> => {
+      const result = await signUp({
+        email: form.email,
+        password: form.password,
+        displayName: form.name,
+        level: form.level,
+        phone: form.phone,
+      });
       if (result.error) return { error: result.error.message };
-      await refresh();
-      return { userId: result.user.id };
+      // With email confirmation on, there is no session until the link is clicked.
+      const signedIn = !!(await refresh());
+      return { userId: result.user.id, signedIn };
     },
     [refresh],
   );
 
   const logIn = useCallback(
-    async (username: string, password: string): Promise<AuthOutcome> => {
-      const result = await signInWithUsername(username, password);
+    async (email: string, password: string): Promise<AuthOutcome> => {
+      const result = await signIn(email, password);
       if (result.error) return { error: result.error.message };
       await refresh();
-      return { userId: result.user.id };
+      return { userId: result.user.id, signedIn: true };
     },
     [refresh],
   );
@@ -58,10 +54,11 @@ export function useSession() {
   const logOut = useCallback(async () => {
     await signOut();
     memberId.current = null;
-    setCurrentMember(null);
+    setMember(null);
+    setContact(null);
   }, []);
 
-  const patchMember = (changes: Partial<Member>) => setCurrentMember((prev) => prev && { ...prev, ...changes });
+  const patchMember = (changes: Partial<Member>) => setMember((prev) => prev && { ...prev, ...changes });
 
   const updatePhoto = useCallback(async (file: File) => {
     const id = memberId.current;
@@ -89,5 +86,19 @@ export function useSession() {
     updateProfileLevel(memberId.current, level).catch(() => {});
   }, []);
 
-  return { currentMember, profileUploading, refresh, signUp, logIn, logOut, updatePhoto, updatePhotoUrl, updateLevel };
+  const isAdmin = member?.role === "owner" || member?.role === "admin";
+
+  return {
+    member,
+    contact,
+    isAdmin,
+    profileUploading,
+    refresh,
+    signUp: register,
+    logIn,
+    logOut,
+    updatePhoto,
+    updatePhotoUrl,
+    updateLevel,
+  };
 }

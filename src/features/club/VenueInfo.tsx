@@ -20,6 +20,8 @@ interface VenueInfoProps {
   venue: string;
   photo: string | null;
   amenities: Amenities;
+  /** Owners and admins may change the photo and amenities. */
+  canEdit: boolean;
   photoUploading: boolean;
   photoError: string;
   onUploadPhoto: (file: File) => void;
@@ -32,6 +34,7 @@ export function VenueInfo({
   venue,
   photo,
   amenities,
+  canEdit,
   photoUploading,
   photoError,
   onUploadPhoto,
@@ -66,15 +69,17 @@ export function VenueInfo({
           }}
         >
           <Eyebrow>{venue}</Eyebrow>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <PhotoInput
-              label={photo ? "사진 교체" : "사진 추가"}
-              uploading={photoUploading}
-              onFile={onUploadPhoto}
-              onSetUrl={onSetPhotoUrl}
-              dark
-            />
-          </div>
+          {canEdit && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <PhotoInput
+                label={photo ? "사진 교체" : "사진 추가"}
+                uploading={photoUploading}
+                onFile={onUploadPhoto}
+                onSetUrl={onSetPhotoUrl}
+                dark
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -101,7 +106,8 @@ export function VenueInfo({
             return (
               <button
                 key={a.key}
-                onClick={() => onToggleAmenity(a.key)}
+                onClick={() => canEdit && onToggleAmenity(a.key)}
+                disabled={!canEdit}
                 style={{
                   padding: "6px 12px",
                   borderRadius: 999,
@@ -110,7 +116,7 @@ export function VenueInfo({
                   color: active ? "#fff" : "rgba(27,36,34,0.5)",
                   fontSize: 12,
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: canEdit ? "pointer" : "default",
                 }}
               >
                 {active ? "✓ " : ""}

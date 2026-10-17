@@ -1,28 +1,11 @@
-import { VENUE_TIME_ZONE } from "@/features/club/constants";
-
-/** One bookable hour on one court. */
+/** One bookable hour on one court, in the venue's wall-clock time. */
 export interface Slot {
+  /** YYYY-MM-DD */
   date: string;
+  /** HH:MM */
   time: string;
-  court: number;
+  courtId: string;
 }
-
-export function generateTimeSlots(startHour: number, endHour: number, stepMinutes: number) {
-  const slots: string[] = [];
-  let mins = startHour * 60;
-  const end = endHour * 60;
-  while (mins <= end) {
-    const h = String(Math.floor(mins / 60)).padStart(2, "0");
-    const m = String(mins % 60).padStart(2, "0");
-    slots.push(`${h}:${m}`);
-    mins += stepMinutes;
-  }
-  return slots;
-}
-
-export const TIME_SLOTS = generateTimeSlots(7, 22, 60);
-
-const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
 
 export interface DayOption {
   iso: string;
@@ -31,23 +14,62 @@ export interface DayOption {
   isToday: boolean;
 }
 
-/* Today's calendar date at the venue, as YYYY-MM-DD. Bookings are for a
-   wall-clock hour at the venue, so "today" must not depend on the viewer's
-   own timezone, nor on UTC (which is still yesterday until 09:00 in Korea). */
-function venueDate(now: Date) {
+const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/* Each date/time part of `at`, read in `timeZone`. */
+function zonedParts(at: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: VENUE_TIME_ZONE,
+    timeZone,
+    hourCycle: "h23",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(now);
-  const part = (type: string) => parts.find((p) => p.type === type)?.value;
-  return `${part("year")}-${part("month")}-${part("day")}`;
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(at);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
 }
 
-export function nextDays(count: number, now = new Date()) {
+/** The calendar date of `at` in `timeZone`, as YYYY-MM-DD. */
+export function zonedDate(at: Date, timeZone: string) {
+  const { year, month, day } = zonedParts(at, timeZone);
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+/** The instant at which the wall clock in `timeZone` reads `date` `time`. */
+export function toInstant(date: string, time: string, timeZone: string): Date {
+  // Read the naive timestamp as UTC, then shift by the zone's offset at that moment.
+  const naive = new Date(`${date}T${time}:00Z`);
+  const p = zonedParts(naive, timeZone);
+  const offsetMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - naive.getTime();
+  return new Date(naive.getTime() - offsetMs);
+}
+
+export const addHours = (at: Date, hours: number) => new Date(at.getTime() + hours * 3_600_000);
+
+/** Hourly slot starts between opening and closing time, e.g. 07:00 … 21:00 for 07:00–22:00. */
+export function hoursBetween(openTime: string, closeTime: string) {
+  const [openH] = openTime.split(":").map(Number);
+  const [closeH] = closeTime.split(":").map(Number);
+  const out: string[] = [];
+  for (let h = openH; h < closeH; h++) out.push(`${pad(h)}:00`);
+  return out;
+}
+
+/** The next `count` calendar days at the venue, starting today there. */
+export function nextDays(count: number, timeZone: string, now = new Date()): DayOption[] {
   // Held as UTC midnight so the day arithmetic below is timezone-free.
-  const today = new Date(`${venueDate(now)}T00:00:00Z`);
+  const today = new Date(`${zonedDate(now, timeZone)}T00:00:00Z`);
   const out: DayOption[] = [];
   for (let i = 0; i < count; i++) {
     const d = new Date(today);
@@ -60,4 +82,10 @@ export function nextDays(count: number, now = new Date()) {
     });
   }
   return out;
+}
+
+/** The wall-clock "HH:MM" of `at` in `timeZone`. */
+export function zonedTime(at: Date, timeZone: string) {
+  const { hour, minute } = zonedParts(at, timeZone);
+  return `${pad(hour)}:${pad(minute)}`;
 }

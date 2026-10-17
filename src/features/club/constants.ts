@@ -1,9 +1,6 @@
 import type { LeagueFormat } from "@/lib/types";
 
-export const VENUES = ["Yongsan Mmove", "Gimpo Padel Society", "Dongtan Garros Padel"];
-
-/** Every venue is in Korea; booking dates and hours are in this timezone. */
-export const VENUE_TIME_ZONE = "Asia/Seoul";
+export const CLUB_NAME = "K-Padel Arena";
 
 export const AMENITIES = [
   { key: "parking", label: "주차" },
@@ -29,6 +26,6 @@ export const FORMATS: { key: LeagueFormat; label: string; tooltip: string }[] = 
   {
     key: "round_robin",
     label: "라운드로빈 · 팀전",
-    tooltip: "처음에 정한 고정 팀끼리 서로 한 번씩 맞붙는 리그전 방식이에요. (이 형식은 아직 이 기기에만 저장돼요)",
+    tooltip: "처음에 정한 고정 팀끼리 서로 한 번씩 맞붙는 리그전 방식이에요.",
   },
 ];

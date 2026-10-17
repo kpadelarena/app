@@ -1,200 +1,280 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import type { Booking, BookingCategory, Participant, Player } from "@/lib/types";
+import { getMembers, type Who } from "@/lib/db";
+import type { Booking, BookingKind, Member, Participant, Venue, Visibility } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
-import { BOOKING_SLOTS_PER_MATCH, CATEGORIES, categoryOf } from "./constants";
-import { TIME_SLOTS, type Slot } from "./slots";
+import { CHANGE_CUTOFF_HOURS, KINDS, changesOpen, kindOf } from "./constants";
+import { zonedTime, type Slot } from "./slots";
+
+const VISIBILITIES: { key: Visibility; label: string; hint: string }[] = [
+  { key: "public", label: "공개", hint: "누구나 참여할 수 있어요" },
+  { key: "private", label: "비공개", hint: "참여자가 초대한 사람만" },
+];
+
+const chipStyle = (active: boolean, color: string) =>
+  ({
+    padding: "6px 12px",
+    borderRadius: 999,
+    border: `1px solid ${active ? color : "rgba(0,0,0,0.15)"}`,
+    background: active ? color : "transparent",
+    color: active ? "#fff" : C.charcoal,
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  }) as const;
 
 interface JoinModalProps {
+  venue: Venue;
   slot: Slot;
-  /** The booking already in this slot, if any. */
+  /** The booking already covering this slot, if any. */
   booking?: Booking;
-  players: Player[];
-  availableDurations: number[];
-  onJoin: (category: BookingCategory, duration: number, participant: Participant) => void;
-  onRemove: (participantId: string) => void;
+  member: Member | null;
+  isAdmin: boolean;
+  /** Free consecutive hours starting at the slot, for a new booking. */
+  freeHours: number;
+  onCreate: (hours: number, kind: BookingKind, visibility: Visibility) => void;
+  onJoin: (who: Who) => void;
+  onLeave: (participantId: string) => void;
+  onOpenAuth: () => void;
   onClose: () => void;
 }
 
 /* Opened from a grid cell: book the slot, or join / leave the booking in it. */
-export function JoinModal({ slot, booking, players, availableDurations, onJoin, onRemove, onClose }: JoinModalProps) {
-  const [joinPlayerId, setJoinPlayerId] = useState(players[0]?.id || "");
+export function JoinModal({
+  venue,
+  slot,
+  booking,
+  member,
+  isAdmin,
+  freeHours,
+  onCreate,
+  onJoin,
+  onLeave,
+  onOpenAuth,
+  onClose,
+}: JoinModalProps) {
+  const [hours, setHours] = useState(1);
+  const [kind, setKind] = useState<BookingKind>("match");
+  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [addMemberId, setAddMemberId] = useState("");
   const [guestName, setGuestName] = useState("");
-  const [category, setCategory] = useState(booking ? booking.category : CATEGORIES[0].key);
-  const [duration, setDuration] = useState(1);
 
-  const count = booking ? booking.players.length : 0;
-  const full = count >= BOOKING_SLOTS_PER_MATCH;
-  const isNewBooking = !booking;
-  const endTime = TIME_SLOTS[Math.min(TIME_SLOTS.indexOf(slot.time) + duration, TIME_SLOTS.length - 1)] || slot.time;
+  const court = venue.courts.find((c) => c.id === slot.courtId);
+  const count = booking ? booking.participants.length : 0;
+  const full = count >= venue.maxPlayers;
+  const amParticipant = !!member && !!booking?.participants.some((p) => p.profileId === member.id);
+  // Members may change a booking until the cutoff; admins always may.
+  const open = isAdmin || !booking || changesOpen(booking.startsAt);
+  const canJoinSelf = !!member && !!booking && open && !full && !amParticipant && booking.visibility === "public";
+  const canAddOthers = !!member && !!booking && open && !full && (isAdmin || amParticipant);
+  const canRemove = (p: Participant) =>
+    !!member && open && (isAdmin || p.profileId === member.id || p.addedBy === member.id);
 
-  const join = () => {
-    const chosenPlayer = players.find((p) => p.id === joinPlayerId);
-    const typedName = guestName.trim();
-    const name = typedName || chosenPlayer?.name;
-    if (!name) return;
-    // Only accounts join by profile id; a typed name or a name-only club
-    // player joins as a guest.
-    const asGuest = !!typedName || !!chosenPlayer?.isGuest;
-    onJoin(category, duration, { profileId: asGuest ? null : chosenPlayer?.id, name });
+  useEffect(() => {
+    if (!canAddOthers) return;
+    let cancelled = false;
+    getMembers()
+      .then((list) => !cancelled && setMembers(list))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [canAddOthers]);
+
+  const startLabel = booking ? zonedTime(new Date(booking.startsAt), venue.timezone) : slot.time;
+  const endLabel = booking
+    ? zonedTime(new Date(booking.endsAt), venue.timezone)
+    : `${String(Number(slot.time.slice(0, 2)) + hours).padStart(2, "0")}:00`;
+
+  const addOther = () => {
+    const name = guestName.trim();
+    if (name) onJoin({ guestName: name });
+    else if (addMemberId) onJoin({ profileId: addMemberId });
+    else return;
     setGuestName("");
-    setJoinPlayerId(players[0]?.id || "");
+    setAddMemberId("");
   };
+
+  const inBooking = new Set(booking?.participants.map((p) => p.profileId));
 
   return (
     <BottomSheet
       header={
         <div>
           <Eyebrow>
-            {slot.date} · {slot.time}
-            {isNewBooking && duration > 1 ? ` – ${endTime}` : ""}
+            {slot.date} · {startLabel} – {endLabel}
           </Eyebrow>
-          <div style={{ fontFamily: FONT.display, fontSize: 20, fontWeight: 700, marginTop: 4 }}>코트 {slot.court}</div>
+          <div style={{ fontFamily: FONT.display, fontSize: 20, fontWeight: 700, marginTop: 4 }}>
+            코트 {court?.name ?? "?"}
+          </div>
         </div>
       }
       onClose={onClose}
     >
-      {isNewBooking && (
-        <div style={{ marginTop: 14 }}>
-          <Eyebrow>예약 시간</Eyebrow>
-          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-            {[1, 2, 3].map((d) => {
-              const disabled = !availableDurations.includes(d);
-              const active = duration === d;
-              return (
-                <button
-                  key={d}
-                  disabled={disabled}
-                  onClick={() => setDuration(d)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 10,
-                    border: `1px solid ${active ? C.turf : "rgba(0,0,0,0.15)"}`,
-                    background: active ? C.turf : disabled ? "#F1F1EC" : "transparent",
-                    color: active ? "#fff" : disabled ? "rgba(0,0,0,0.3)" : C.charcoal,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: disabled ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {d}시간
-                </button>
-              );
-            })}
+      {!member && (
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 13, color: "rgba(27,36,34,0.6)" }}>
+            {booking ? "이미 예약된 시간이에요. " : ""}로그인하면 코트를 예약하고 참여할 수 있어요.
           </div>
+          <PrimaryButton onClick={onOpenAuth}>회원가입 · 로그인</PrimaryButton>
         </div>
       )}
 
-      <div style={{ marginTop: 14 }}>
-        {booking ? (
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "5px 12px",
-              borderRadius: 999,
-              background: categoryOf(booking.category).color,
-              color: "#fff",
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-          >
-            {categoryOf(booking.category).label}
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setCategory(c.key)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: `1px solid ${category === c.key ? c.color : "rgba(0,0,0,0.15)"}`,
-                  background: category === c.key ? c.color : "transparent",
-                  color: category === c.key ? "#fff" : C.charcoal,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-        {Array.from({ length: BOOKING_SLOTS_PER_MATCH }, (_, i) => {
-          const p = booking?.players[i];
-          return (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: p ? C.paperDim : "transparent",
-                border: p ? "none" : "1px dashed rgba(0,0,0,0.2)",
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: p ? 700 : 500, color: p ? C.charcoal : "rgba(27,36,34,0.4)" }}>
-                {p ? p.name : `빈 자리 ${i + 1}`}
-              </span>
-              {p && (
-                <button
-                  onClick={() => onRemove(p.id)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(27,36,34,0.4)" }}
-                >
-                  <Trash2 size={14} />
+      {member && !booking && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <Eyebrow>예약 시간</Eyebrow>
+            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              {Array.from({ length: Math.max(1, freeHours) }, (_, i) => i + 1).map((h) => (
+                <button key={h} onClick={() => setHours(h)} style={chipStyle(hours === h, C.turf)}>
+                  {h}시간
                 </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {!full && (
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-          <Eyebrow>참여하기</Eyebrow>
-          {players.length > 0 && (
-            <select
-              value={joinPlayerId}
-              onChange={(e) => {
-                setJoinPlayerId(e.target.value);
-                setGuestName("");
-              }}
-              style={fieldStyle}
-            >
-              <option value="">등록된 선수 선택</option>
-              {players.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
               ))}
-            </select>
+            </div>
+          </div>
+
+          {isAdmin && (
+            <div>
+              <Eyebrow>종류</Eyebrow>
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                {KINDS.map((k) => (
+                  <button key={k.key} onClick={() => setKind(k.key)} style={chipStyle(kind === k.key, k.color)}>
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-          <input
-            value={guestName}
-            onChange={(e) => {
-              setGuestName(e.target.value);
-              setJoinPlayerId("");
-            }}
-            placeholder="또는 이름 직접 입력 (게스트)"
-            style={fieldStyle}
-          />
-          <PrimaryButton onClick={join} icon={UserPlus}>
-            {isNewBooking ? "예약하기" : "이 시간에 참여"}
+
+          <div>
+            <Eyebrow>공개 여부</Eyebrow>
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              {VISIBILITIES.map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setVisibility(v.key)}
+                  title={v.hint}
+                  style={chipStyle(visibility === v.key, C.turf)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
+              {VISIBILITIES.find((v) => v.key === visibility)?.hint}
+            </div>
+          </div>
+
+          <PrimaryButton onClick={() => onCreate(hours, kind, visibility)} icon={UserPlus}>
+            예약하기
           </PrimaryButton>
         </div>
+      )}
+
+      {member && booking && (
+        <>
+          <div style={{ marginTop: 14, display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ ...chipStyle(true, kindOf(booking.kind).color), cursor: "default" }}>
+              {kindOf(booking.kind).label}
+            </span>
+            <span style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
+              {booking.visibility === "private" ? "비공개 · 참여자가 초대한 사람만" : "공개 · 누구나 참여 가능"}
+            </span>
+          </div>
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: venue.maxPlayers }, (_, i) => {
+              const p = booking.participants[i];
+              return (
+                <div
+                  key={p?.id ?? i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    background: p ? C.paperDim : "transparent",
+                    border: p ? "none" : "1px dashed rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <span
+                    style={{ fontSize: 14, fontWeight: p ? 700 : 500, color: p ? C.charcoal : "rgba(27,36,34,0.4)" }}
+                  >
+                    {p ? p.name : `빈 자리 ${i + 1}`}
+                    {p?.isGuest && (
+                      <span style={{ marginLeft: 6, fontSize: 11, color: "rgba(27,36,34,0.5)" }}>게스트</span>
+                    )}
+                  </span>
+                  {p && canRemove(p) && (
+                    <button
+                      onClick={() => onLeave(p.id)}
+                      title={p.profileId === member.id ? "참여 취소" : "내보내기"}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(27,36,34,0.4)" }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {!open && (
+            <div style={{ marginTop: 12, fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
+              시작 {CHANGE_CUTOFF_HOURS}시간 전까지만 참여하거나 취소할 수 있어요. 변경이 필요하면 관리자에게
+              알려주세요.
+            </div>
+          )}
+
+          {canJoinSelf && (
+            <div style={{ marginTop: 16 }}>
+              <PrimaryButton onClick={() => onJoin({ profileId: member.id })} icon={UserPlus}>
+                이 시간에 참여
+              </PrimaryButton>
+            </div>
+          )}
+
+          {canAddOthers && (
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <Eyebrow>같이 할 사람 추가</Eyebrow>
+              <select
+                value={addMemberId}
+                onChange={(e) => {
+                  setAddMemberId(e.target.value);
+                  setGuestName("");
+                }}
+                style={fieldStyle}
+              >
+                <option value="">회원 선택</option>
+                {members
+                  .filter((m) => !inBooking.has(m.id))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+              </select>
+              <input
+                value={guestName}
+                onChange={(e) => {
+                  setGuestName(e.target.value);
+                  setAddMemberId("");
+                }}
+                placeholder="또는 게스트 이름 입력"
+                style={fieldStyle}
+              />
+              <PrimaryButton onClick={addOther} icon={UserPlus} disabled={!guestName.trim() && !addMemberId}>
+                추가
+              </PrimaryButton>
+            </div>
+          )}
+        </>
       )}
     </BottomSheet>
   );
