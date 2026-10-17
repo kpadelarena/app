@@ -20,9 +20,8 @@ create type public.league_format as enum ('americano', 'mexicano', 'round_robin'
 -- the last one can never be demoted or deleted.
 --
 -- Every signed-in member can read every profile (it is the member
--- list), so nothing private belongs here. Email lives only in auth.users
--- and is read from the session; contact details would need their own
--- table with self/admin-only access.
+-- list), so nothing private belongs here: email and phone live in
+-- profile_contacts, which only the person and admins can read.
 -- ---------------------------------------------------------------------
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -55,6 +54,7 @@ begin
     coalesce(meta ->> 'avatar_url', meta ->> 'picture'),
     (case when exists (select 1 from public.profiles where role = 'owner') then 'member' else 'owner' end)::public.member_role
   );
+  insert into public.profile_contacts (id, email) values (new.id, new.email);
   return new;
 end;
 $$;
@@ -62,6 +62,36 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------
+-- profile_contacts — the sensitive part of a profile, one row per
+-- account. Readable by the person and by admins only. Email is a copy
+-- of auth.users.email kept in sync by trigger (the auth schema is not
+-- reachable from the app); phone is entered by the person.
+-- ---------------------------------------------------------------------
+create table public.profile_contacts (
+  id uuid primary key references public.profiles (id) on delete cascade,
+  email text,
+  phone text,
+  updated_at timestamptz not null default now()
+);
+
+create function public.sync_contact_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profile_contacts set email = new.email, updated_at = now() where id = new.id;
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_email_changed
+  after update of email on auth.users
+  for each row when (old.email is distinct from new.email)
+  execute function public.sync_contact_email();
 
 create function public.protect_last_owner()
 returns trigger

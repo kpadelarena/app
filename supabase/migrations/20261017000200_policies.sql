@@ -3,7 +3,8 @@
 --
 --   - Logged-out visitors can read venues, courts, booking times and
 --     league events, but no names: profiles, participants and rosters
---     need a login.
+--     need a login. Email and phone (profile_contacts) are visible only
+--     to the person and to admins.
 --   - Owners and admins ("admins" below) manage venues, courts, leagues,
 --     lessons and anything else; only owners change roles.
 --   - Members create matches, join public ones, and add people to
@@ -134,6 +135,24 @@ create policy "profiles_update_self_or_owner" on public.profiles
   for update to authenticated
   using (id = auth.uid() or public.is_owner())
   with check (id = auth.uid() or public.is_owner());
+
+-- ---------------------------------------------------------------------
+-- profile_contacts: only the person and admins. Rows are created and
+-- the email column maintained by triggers; the app can only edit phone.
+-- ---------------------------------------------------------------------
+alter table public.profile_contacts enable row level security;
+
+create policy "contacts_select_self_or_admin" on public.profile_contacts
+  for select to authenticated
+  using (id = auth.uid() or public.is_admin());
+
+create policy "contacts_update_self_or_admin" on public.profile_contacts
+  for update to authenticated
+  using (id = auth.uid() or public.is_admin())
+  with check (id = auth.uid() or public.is_admin());
+
+revoke update on public.profile_contacts from authenticated;
+grant update (phone) on public.profile_contacts to authenticated;
 
 -- ---------------------------------------------------------------------
 -- venues, courts, leagues: public to read, admins write

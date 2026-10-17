@@ -3,7 +3,7 @@
 -- transaction that is rolled back at the end.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(35);
+select plan(42);
 
 -- Helpers to act as a signed-in user, or as a logged-out visitor.
 create function pg_temp.login(uid uuid) returns void language plpgsql as $$
@@ -41,6 +41,30 @@ insert into auth.users (id, email, raw_user_meta_data) values
 select is((select role from public.profiles where id = '00000000-0000-4000-8000-000000000001'), 'owner', 'the first account becomes owner');
 select is((select role from public.profiles where id = '00000000-0000-4000-8000-000000000002'), 'member', 'later accounts are members');
 select is((select display_name from public.profiles where id = '00000000-0000-4000-8000-000000000003'), 'third', 'display name falls back to the email prefix');
+
+-- Contact details
+select is((select email from public.profile_contacts where id = '00000000-0000-4000-8000-000000000001'), 'first@example.com',
+  'sign-up creates the contact row with the account email');
+select pg_temp.superuser();
+update auth.users set email = 'renamed@example.com' where id = '00000000-0000-4000-8000-000000000001';
+select is((select email from public.profile_contacts where id = '00000000-0000-4000-8000-000000000001'), 'renamed@example.com',
+  'an email change in auth is copied to the contact row');
+
+select pg_temp.login('00000000-0000-4000-8000-000000000002');
+select is((select count(*)::int from public.profile_contacts), 1, 'a member sees only their own contact details');
+update public.profile_contacts set phone = '010-0000-0000' where id = '00000000-0000-4000-8000-000000000002';
+select is((select phone from public.profile_contacts where id = '00000000-0000-4000-8000-000000000002'), '010-0000-0000',
+  'a member can set their own phone number');
+update public.profile_contacts set phone = '010-9999-9999' where id = '00000000-0000-4000-8000-000000000001';
+select pg_temp.superuser();
+select is((select phone from public.profile_contacts where id = '00000000-0000-4000-8000-000000000001'), null,
+  'a member cannot change another member''s phone number');
+select pg_temp.login('00000000-0000-4000-8000-000000000002');
+select throws_ok(
+  $$ update public.profile_contacts set email = 'spoof@example.com' where id = '00000000-0000-4000-8000-000000000002' $$,
+  '42501', null, 'a member cannot edit their stored email');
+select pg_temp.login('00000000-0000-4000-8000-000000000001'); -- the owner
+select is((select count(*)::int from public.profile_contacts), 3, 'an admin sees everyone''s contact details');
 
 -- Roles
 select pg_temp.login('00000000-0000-4000-8000-000000000002');

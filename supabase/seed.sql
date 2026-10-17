@@ -32,6 +32,7 @@ select id, id::text, 'email', jsonb_build_object('sub', id::text, 'email', email
 from auth.users;
 
 update public.profiles set role = 'admin' where id = '22222222-2222-4222-8222-222222222222';
+update public.profile_contacts set phone = '010-1234-5678' where id = '11111111-1111-4111-8111-111111111111';
 
 -- Venues and courts.
 insert into public.venues (id, name, address, sort_order) values
