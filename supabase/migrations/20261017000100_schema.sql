@@ -41,7 +41,8 @@ as $$
 declare
   meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
 begin
-  insert into public.profiles (id, display_name, photo_url, role)
+  -- The sign-up form passes display_name, level and phone as user metadata.
+  insert into public.profiles (id, display_name, level, photo_url, role)
   values (
     new.id,
     coalesce(
@@ -51,10 +52,11 @@ begin
       nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
       '회원'
     ),
+    coalesce(nullif(meta ->> 'level', '')::numeric, 3.0),
     coalesce(meta ->> 'avatar_url', meta ->> 'picture'),
     (case when exists (select 1 from public.profiles where role = 'owner') then 'member' else 'owner' end)::public.member_role
   );
-  insert into public.profile_contacts (id, email) values (new.id, new.email);
+  insert into public.profile_contacts (id, email, phone) values (new.id, new.email, nullif(meta ->> 'phone', ''));
   return new;
 end;
 $$;
