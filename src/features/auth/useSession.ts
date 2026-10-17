@@ -1,28 +1,55 @@
-import { useCallback, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentMember, signIn, signOut, signUp } from "@/lib/auth";
 import { setAvatarUrl, updateProfileLevel, uploadAvatar } from "@/lib/db";
-import type { Contact, Member } from "@/lib/types";
+import { queryKeys } from "@/lib/queryKeys";
+import { supabase } from "@/lib/supabaseClient";
+import type { Member } from "@/lib/types";
 import type { SignUpForm } from "./AuthModal";
 
 export type AuthOutcome = { error: string } | { userId: string; signedIn: boolean };
 
+type Session = Awaited<ReturnType<typeof getCurrentMember>>;
+
 /* The signed-in member's profile and contact details, plus the actions that change them. */
 export function useSession() {
-  const [member, setMember] = useState<Member | null>(null);
-  const [contact, setContact] = useState<Contact | null>(null);
+  const queryClient = useQueryClient();
   const [profileUploading, setProfileUploading] = useState(false);
-  // The id is also kept in a ref so that an action started right after
-  // sign-up (uploading the chosen photo) sees the new account at once.
-  const memberId = useRef<string | null>(null);
 
-  /* Re-reads the profile from the current auth session; null when signed out. */
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session,
+    queryFn: getCurrentMember,
+    // Only auth events and the actions below change it.
+    staleTime: Infinity,
+  });
+  const member = sessionQuery.data?.member ?? null;
+  const contact = sessionQuery.data?.contact ?? null;
+
+  // Anything that depends on who is signed in is re-read on sign-in/out,
+  // including bookings: participants are only visible to members.
+  const invalidateMemberData = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.myBookings.all });
+  }, [queryClient]);
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.session });
+      invalidateMemberData();
+    });
+    return () => data.subscription.unsubscribe();
+  }, [queryClient, invalidateMemberData]);
+
+  /* Re-reads the session now and returns it. */
   const refresh = useCallback(async () => {
-    const current = await getCurrentMember();
-    memberId.current = current?.member.id ?? null;
-    setMember(current?.member ?? null);
-    setContact(current?.contact ?? null);
-    return current?.member ?? null;
-  }, []);
+    const current = await queryClient.fetchQuery({
+      queryKey: queryKeys.session,
+      queryFn: getCurrentMember,
+      staleTime: 0,
+    });
+    invalidateMemberData();
+    return current;
+  }, [queryClient, invalidateMemberData]);
 
   const register = useCallback(
     async (form: SignUpForm): Promise<AuthOutcome> => {
@@ -53,38 +80,61 @@ export function useSession() {
 
   const logOut = useCallback(async () => {
     await signOut();
-    memberId.current = null;
-    setMember(null);
-    setContact(null);
-  }, []);
+    queryClient.setQueryData<Session>(queryKeys.session, null);
+    invalidateMemberData();
+  }, [queryClient, invalidateMemberData]);
 
-  const patchMember = (changes: Partial<Member>) => setMember((prev) => prev && { ...prev, ...changes });
+  /* The current member id straight from the cache, so an action started
+     right after sign-up (uploading the chosen photo) sees the new account. */
+  const currentMemberId = useCallback(
+    () => queryClient.getQueryData<Session>(queryKeys.session)?.member.id ?? null,
+    [queryClient],
+  );
 
-  const updatePhoto = useCallback(async (file: File) => {
-    const id = memberId.current;
-    if (!id) return;
-    setProfileUploading(true);
-    try {
-      patchMember({ photo: await uploadAvatar(id, file) });
-    } catch {
-      // couldn't read/upload the file
-    } finally {
-      setProfileUploading(false);
-    }
-  }, []);
+  const patchMember = useCallback(
+    (changes: Partial<Member>) =>
+      queryClient.setQueryData<Session>(queryKeys.session, (prev) =>
+        prev ? { ...prev, member: { ...prev.member, ...changes } } : prev,
+      ),
+    [queryClient],
+  );
+
+  const updatePhoto = useCallback(
+    async (file: File) => {
+      const id = currentMemberId();
+      if (!id) return;
+      setProfileUploading(true);
+      try {
+        patchMember({ photo: await uploadAvatar(id, file) });
+      } catch {
+        // couldn't read/upload the file
+      } finally {
+        setProfileUploading(false);
+      }
+    },
+    [currentMemberId, patchMember],
+  );
 
   /* Profile edits apply locally at once; saving is best effort. */
-  const updatePhotoUrl = useCallback((url: string) => {
-    if (!memberId.current) return;
-    patchMember({ photo: url });
-    setAvatarUrl(memberId.current, url).catch(() => {});
-  }, []);
+  const updatePhotoUrl = useCallback(
+    (url: string) => {
+      const id = currentMemberId();
+      if (!id) return;
+      patchMember({ photo: url });
+      setAvatarUrl(id, url).catch(() => {});
+    },
+    [currentMemberId, patchMember],
+  );
 
-  const updateLevel = useCallback((level: number) => {
-    if (!memberId.current) return;
-    patchMember({ level });
-    updateProfileLevel(memberId.current, level).catch(() => {});
-  }, []);
+  const updateLevel = useCallback(
+    (level: number) => {
+      const id = currentMemberId();
+      if (!id) return;
+      patchMember({ level });
+      updateProfileLevel(id, level).catch(() => {});
+    },
+    [currentMemberId, patchMember],
+  );
 
   const isAdmin = member?.role === "owner" || member?.role === "admin";
 
@@ -92,8 +142,8 @@ export function useSession() {
     member,
     contact,
     isAdmin,
+    isLoading: sessionQuery.isPending,
     profileUploading,
-    refresh,
     signUp: register,
     logIn,
     logOut,

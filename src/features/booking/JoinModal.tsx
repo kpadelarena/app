@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { fieldStyle } from "@/components/ui/fieldStyle";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { getMembers, type Who } from "@/lib/db";
+import { queryKeys } from "@/lib/queryKeys";
 import type { Booking, BookingKind, Member, Participant, Venue, Visibility } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { CHANGE_CUTOFF_HOURS, KINDS, changesOpen, kindOf } from "./constants";
@@ -60,7 +62,6 @@ export function JoinModal({
   const [hours, setHours] = useState(1);
   const [kind, setKind] = useState<BookingKind>("match");
   const [visibility, setVisibility] = useState<Visibility>("public");
-  const [members, setMembers] = useState<Member[]>([]);
   const [addMemberId, setAddMemberId] = useState("");
   const [guestName, setGuestName] = useState("");
 
@@ -75,16 +76,7 @@ export function JoinModal({
   const canRemove = (p: Participant) =>
     !!member && open && (isAdmin || p.profileId === member.id || p.addedBy === member.id);
 
-  useEffect(() => {
-    if (!canAddOthers) return;
-    let cancelled = false;
-    getMembers()
-      .then((list) => !cancelled && setMembers(list))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [canAddOthers]);
+  const { data: members = [] } = useQuery({ queryKey: queryKeys.members, queryFn: getMembers, enabled: canAddOthers });
 
   const startLabel = booking ? zonedTime(new Date(booking.startsAt), venue.timezone) : slot.time;
   const endLabel = booking

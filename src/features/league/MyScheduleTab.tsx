@@ -1,4 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { CSSProperties } from "react";
 import { EmptyHint } from "@/components/ui/EmptyHint";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -6,7 +7,8 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { kindOf } from "@/features/booking/constants";
 import { zonedDate } from "@/features/booking/slots";
 import { getMyBookings } from "@/lib/db";
-import type { Member, MyBooking } from "@/lib/types";
+import { queryKeys } from "@/lib/queryKeys";
+import type { Member } from "@/lib/types";
 import { C } from "@/styles/tokens";
 
 const rowStyle: CSSProperties = {
@@ -27,18 +29,11 @@ const timeRange = (startsAt: string, endsAt: string) => {
 
 /* The signed-in member's upcoming court bookings at any venue. */
 export function MyScheduleTab({ member, onOpenAuth }: { member: Member | null; onOpenAuth: () => void }) {
-  const [bookings, setBookings] = useState<MyBooking[] | null>(null);
-
-  useEffect(() => {
-    if (!member) return;
-    let cancelled = false;
-    getMyBookings(member.id, new Date())
-      .then((list) => !cancelled && setBookings(list))
-      .catch(() => !cancelled && setBookings([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [member]);
+  const { data: bookings } = useQuery({
+    queryKey: queryKeys.myBookings.forMember(member?.id ?? ""),
+    queryFn: () => getMyBookings(member!.id, new Date()),
+    enabled: !!member,
+  });
 
   if (!member) {
     return (
@@ -56,7 +51,7 @@ export function MyScheduleTab({ member, onOpenAuth }: { member: Member | null; o
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SectionCard>
         <Eyebrow>내 코트 예약</Eyebrow>
-        {bookings === null ? null : bookings.length === 0 ? (
+        {!bookings ? null : bookings.length === 0 ? (
           <EmptyHint text="예약한 코트가 없어요. 코트 예약 탭에서 참여해 보세요." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>

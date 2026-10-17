@@ -46,13 +46,15 @@ function LegendDot({ color, border, label }: { color: string; border: string; la
 
 interface BookingCellProps {
   booking?: Booking;
+  /** The hour has already started; nothing can be booked or changed. */
+  past: boolean;
   maxPlayers: number;
   /** Logged-out visitors see that a slot is taken, but not how many are playing. */
   showCount: boolean;
   onClick: () => void;
 }
 
-function BookingCell({ booking, maxPlayers, showCount, onClick }: BookingCellProps) {
+function BookingCell({ booking, past, maxPlayers, showCount, onClick }: BookingCellProps) {
   const count = booking ? booking.participants.length : 0;
   const full = count >= maxPlayers;
   const empty = !booking;
@@ -61,6 +63,9 @@ function BookingCell({ booking, maxPlayers, showCount, onClick }: BookingCellPro
   const bg = empty ? "#fff" : full ? "#3E6FD9" : "#D6E6FB";
   const border = empty ? "rgba(0,0,0,0.15)" : full ? "#3E6FD9" : "#7FA6E0";
 
+  if (past && empty) {
+    return <div style={{ height: 56, borderRadius: 10, background: "rgba(0,0,0,0.04)" }} />;
+  }
   return (
     <button
       onClick={onClick}
@@ -70,6 +75,7 @@ function BookingCell({ booking, maxPlayers, showCount, onClick }: BookingCellPro
         border: `1px solid ${border}`,
         background: bg,
         color: full ? "#fff" : C.charcoal,
+        opacity: past ? 0.6 : 1,
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
@@ -232,6 +238,7 @@ export function BookingTab({
                       <BookingCell
                         key={court.id}
                         booking={bookingAt(slot)}
+                        past={slotStart(slot).getTime() < Date.now()}
                         maxPlayers={venue.maxPlayers}
                         showCount={!!member}
                         onClick={() => setActiveSlot(slot)}
