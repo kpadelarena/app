@@ -36,6 +36,17 @@ export async function signIn(email: string, password: string): Promise<AuthResul
   return { user: data.user, session: data.session };
 }
 
+/* Sends the browser to Google; Supabase brings it back to this origin
+   with a session. The profile row is created by the same trigger as for
+   email sign-ups, from the name and picture Google provides. */
+export async function signInWithGoogle(): Promise<{ error?: { message: string } }> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin },
+  });
+  return error ? { error } : {};
+}
+
 export async function signOut() {
   await supabase.auth.signOut();
 }

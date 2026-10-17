@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { getCurrentMember, signIn, signOut, signUp } from "@/lib/auth";
+import { getCurrentMember, signIn, signInWithGoogle, signOut, signUp } from "@/lib/auth";
 import { setAvatarUrl, updateProfileLevel, uploadAvatar } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabaseClient";
@@ -77,6 +77,11 @@ export function useSession() {
     [refresh],
   );
 
+  const logInWithGoogle = useCallback(async (): Promise<{ error?: string }> => {
+    const result = await signInWithGoogle();
+    return result.error ? { error: result.error.message } : {};
+  }, []);
+
   const logOut = useCallback(async () => {
     await signOut();
     queryClient.setQueryData<Session>(queryKeys.session, null);
@@ -145,6 +150,7 @@ export function useSession() {
     profileUploading,
     signUp: register,
     logIn,
+    logInWithGoogle,
     logOut,
     updatePhoto,
     updatePhotoUrl,
