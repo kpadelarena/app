@@ -68,6 +68,10 @@ http://localhost:3000 에서 확인. 개발용 로그인 계정은
 | `SUPABASE_DB_PASSWORD`  | 프로젝트 생성 때 정한 데이터베이스 비밀번호               |
 | `SUPABASE_PROJECT_ID`   | 프로젝트 ref (`flfnqurjjjhynizkkpet`)                     |
 
+토큰은 프로젝트 범위(Project → app-prod)로 만들고 권한은 읽기 세 가지만 줍니다:
+Project Settings, API Keys, API Key Secrets (모두 Read). 마이그레이션은
+`SUPABASE_DB_PASSWORD`로 DB에 직접 연결해 적용되므로 쓰기 권한은 필요 없습니다.
+
 수동으로 적용하려면: `pnpm supabase login` → `pnpm supabase link --project-ref <ref>`
 → `pnpm supabase db push`.
 
@@ -104,9 +108,6 @@ Redirect URLs에 `https://*-kpadelarena.vercel.app/**`(프리뷰)와
 
 ## 알려진 제한사항
 
-- **라운드로빈(팀전)**: 팀 편성과 대진표가 아직 Supabase에 저장되지
-  않습니다. 세션 중에만 동작하고 새로고침하면 사라집니다.
-  아메리카노·멕시카노(개인전)는 저장됩니다.
 - **비밀번호 찾기**: 이메일 기반 자동 복구가 없습니다. 관리자가 Supabase
   Dashboard → Authentication → Users에서 해당 사용자의 비밀번호를 직접
   새로 설정해 알려줘야 합니다.

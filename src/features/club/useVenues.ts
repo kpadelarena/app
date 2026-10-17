@@ -49,9 +49,16 @@ export function useVenues(memberId: string | null) {
   useEffect(
     () =>
       subscribeToChanges(() => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.venues });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.myBookings.all });
+        for (const key of [
+          queryKeys.venues,
+          queryKeys.bookings.all,
+          queryKeys.myBookings.all,
+          queryKeys.leagues.all,
+          queryKeys.league.all,
+          queryKeys.myMatches.all,
+        ]) {
+          void queryClient.invalidateQueries({ queryKey: key });
+        }
       }),
     [queryClient],
   );

@@ -4,7 +4,7 @@ import { EmptyHint } from "@/components/ui/EmptyHint";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
-import type { League } from "@/lib/types";
+import type { League, Match } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { CourtMatch } from "./CourtMatch";
 import { nameOf } from "./names";
@@ -17,6 +17,10 @@ const FORMAT_DESCRIPTION = {
 
 interface ScheduleTabProps {
   league: Pick<League, "format" | "players" | "teams" | "rounds">;
+  /** Admins generate and reset the schedule. */
+  canEdit: boolean;
+  /** Whether the viewer may enter this match's score. */
+  canScore: (match: Match) => boolean;
   /** Creates (or re-creates) the schedule; `numRounds` only applies to Americano. */
   onGenerate: (numRounds: number) => void;
   onUpdateScore: (roundIndex: number, matchId: string, field: "scoreA" | "scoreB", value: string) => void;
@@ -26,6 +30,8 @@ interface ScheduleTabProps {
 
 export function ScheduleTab({
   league,
+  canEdit,
+  canScore,
   onGenerate,
   onUpdateScore,
   onGenerateNextMexicanoRound,
@@ -37,83 +43,94 @@ export function ScheduleTab({
   const isIndividual = isAmericano || isMexicano;
   const hasRounds = league.rounds.length > 0;
   const canGenerate = isIndividual ? league.players.length >= 4 : league.teams.length >= 2;
-  const generate = () => onGenerate(numRounds);
+  const generate = () => {
+    if (hasRounds && !confirm("대진표를 다시 만들면 입력한 점수가 사라져요. 계속할까요?")) return;
+    onGenerate(numRounds);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <div
-          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}
-        >
-          <div>
-            <Eyebrow>대진표 생성</Eyebrow>
-            <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)", marginTop: 4 }}>
-              {FORMAT_DESCRIPTION[league.format]}
+      {canEdit && (
+        <SectionCard>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div>
+              <Eyebrow>대진표 생성</Eyebrow>
+              <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)", marginTop: 4 }}>
+                {FORMAT_DESCRIPTION[league.format]}
+              </div>
             </div>
+            {isAmericano && (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                라운드 수
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={numRounds}
+                  onChange={(e) => setNumRounds(Number(e.target.value) || 1)}
+                  style={{
+                    width: 52,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    fontFamily: FONT.mono,
+                    textAlign: "center",
+                  }}
+                />
+              </label>
+            )}
           </div>
-          {isAmericano && (
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              라운드 수
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={numRounds}
-                onChange={(e) => setNumRounds(Number(e.target.value) || 1)}
-                style={{
-                  width: 52,
-                  padding: "6px 8px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(0,0,0,0.15)",
-                  fontFamily: FONT.mono,
-                  textAlign: "center",
-                }}
-              />
-            </label>
-          )}
-        </div>
 
-        <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {isMexicano ? (
-            <>
-              <PrimaryButton
-                onClick={hasRounds ? onGenerateNextMexicanoRound : generate}
-                icon={RefreshCw}
-                disabled={!canGenerate}
-              >
-                {hasRounds ? "다음 라운드 생성" : "1라운드 생성"}
-              </PrimaryButton>
-              {hasRounds && (
+          <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {isMexicano ? (
+              <>
                 <PrimaryButton
-                  onClick={onRemoveLastMexicanoRound}
-                  style={{ background: "transparent", color: C.danger, border: `1px solid ${C.danger}` }}
+                  onClick={hasRounds ? onGenerateNextMexicanoRound : generate}
+                  icon={RefreshCw}
+                  disabled={!canGenerate}
                 >
-                  마지막 라운드 취소
+                  {hasRounds ? "다음 라운드 생성" : "1라운드 생성"}
                 </PrimaryButton>
-              )}
-            </>
-          ) : (
-            <PrimaryButton onClick={generate} icon={RefreshCw} disabled={!canGenerate}>
-              {hasRounds ? "대진표 다시 생성" : "대진표 생성"}
-            </PrimaryButton>
+                {hasRounds && (
+                  <PrimaryButton
+                    onClick={onRemoveLastMexicanoRound}
+                    style={{ background: "transparent", color: C.danger, border: `1px solid ${C.danger}` }}
+                  >
+                    마지막 라운드 취소
+                  </PrimaryButton>
+                )}
+              </>
+            ) : (
+              <PrimaryButton onClick={generate} icon={RefreshCw} disabled={!canGenerate}>
+                {hasRounds ? "대진표 다시 생성" : "대진표 생성"}
+              </PrimaryButton>
+            )}
+          </div>
+
+          {isMexicano && hasRounds && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
+              다음 라운드는 지금까지 입력된 점수를 기준으로 순위를 다시 계산해 짝을 맞춰요. 이번 라운드 점수를 먼저
+              입력하세요.
+            </div>
           )}
-        </div>
 
-        {isMexicano && hasRounds && (
-          <div style={{ marginTop: 8, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-            다음 라운드는 지금까지 입력된 점수를 기준으로 순위를 다시 계산해 짝을 맞춰요. 이번 라운드 점수를 먼저
-            입력하세요.
-          </div>
-        )}
-
-        {!canGenerate && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
-            {isIndividual
-              ? "선수 · 팀 탭에서 4명 이상 등록해 주세요."
-              : "선수 · 팀 탭에서 팀을 2개 이상 편성해 주세요."}
-          </div>
-        )}
-      </SectionCard>
+          {!canGenerate && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "rgba(27,36,34,0.5)" }}>
+              {isIndividual
+                ? "선수 · 팀 탭에서 4명 이상 등록해 주세요."
+                : "선수 · 팀 탭에서 팀을 2개 이상 편성해 주세요."}
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {!hasRounds ? (
         <EmptyHint text="아직 생성된 라운드가 없어요." />
@@ -141,6 +158,7 @@ export function ScheduleTab({
                   match={m}
                   nameOf={(id) => nameOf(league, id)}
                   onScore={(field, value) => onUpdateScore(ri, m.id, field, value)}
+                  readOnly={!canScore(m)}
                 />
               ))}
             </div>

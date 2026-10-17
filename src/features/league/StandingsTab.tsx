@@ -80,6 +80,7 @@ function StandingsTable<Row extends { id: string; name: string }>({
 
 interface StandingsTabProps {
   league: Pick<League, "name" | "format" | "players" | "teams" | "rounds" | "resultPhoto">;
+  canEdit: boolean;
   onUploadResultPhoto: (file: File) => void;
   onSetResultPhotoUrl: (url: string) => void;
   resultPhotoUploading: boolean;
@@ -87,6 +88,7 @@ interface StandingsTabProps {
 
 export function StandingsTab({
   league,
+  canEdit,
   onUploadResultPhoto,
   onSetResultPhotoUrl,
   resultPhotoUploading,
@@ -105,24 +107,28 @@ export function StandingsTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <Eyebrow>결과 사진</Eyebrow>
-        {league.resultPhoto && (
-          <img
-            src={league.resultPhoto}
-            alt="경기 결과"
-            style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 12, marginTop: 10 }}
-          />
-        )}
-        <div style={{ marginTop: 10 }}>
-          <PhotoInput
-            label={league.resultPhoto ? "사진 교체" : "사진 추가"}
-            uploading={resultPhotoUploading}
-            onFile={onUploadResultPhoto}
-            onSetUrl={onSetResultPhotoUrl}
-          />
-        </div>
-      </SectionCard>
+      {(canEdit || league.resultPhoto) && (
+        <SectionCard>
+          <Eyebrow>결과 사진</Eyebrow>
+          {league.resultPhoto && (
+            <img
+              src={league.resultPhoto}
+              alt="경기 결과"
+              style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 12, marginTop: 10 }}
+            />
+          )}
+          {canEdit && (
+            <div style={{ marginTop: 10 }}>
+              <PhotoInput
+                label={league.resultPhoto ? "사진 교체" : "사진 추가"}
+                uploading={resultPhotoUploading}
+                onFile={onUploadResultPhoto}
+                onSetUrl={onSetResultPhotoUrl}
+              />
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {isEmpty ? (
         <EmptyHint text="아직 순위 데이터가 없어요. 대진표에서 경기 결과를 입력해 주세요." />
