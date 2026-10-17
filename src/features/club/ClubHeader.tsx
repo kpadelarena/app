@@ -109,7 +109,7 @@ export function ClubHeader({ venues, venueId, onSelectVenue, account, tabs }: Cl
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Trophy size={18} color={C.ball} />
-            <Eyebrow>{CLUB_NAME.toUpperCase()} MANAGER</Eyebrow>
+            <Eyebrow color={C.ball}>{CLUB_NAME.toUpperCase()} MANAGER</Eyebrow>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
             <img src="/brand-logo.jpg" alt={CLUB_NAME} style={{ width: 108, height: 27, objectFit: "contain" }} />

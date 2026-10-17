@@ -68,7 +68,7 @@ export function VenueInfo({
             padding: 14,
           }}
         >
-          <Eyebrow>{venue}</Eyebrow>
+          <Eyebrow color={C.ball}>{venue}</Eyebrow>
           {canEdit && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <PhotoInput
@@ -99,7 +99,7 @@ export function VenueInfo({
       )}
 
       <SectionCard>
-        <Eyebrow color={C.charcoal}>편의시설</Eyebrow>
+        <Eyebrow>편의시설</Eyebrow>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {AMENITIES.map((a) => {
             const active = !!amenities[a.key];
