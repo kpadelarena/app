@@ -48,10 +48,13 @@ RLS 정책이 담당합니다.)
 
 ## 로컬 개발
 
+Node 24와 [pnpm](https://pnpm.io)이 필요합니다 (`corepack enable`로 pnpm을
+켤 수 있습니다).
+
 ```
-npm install
+pnpm install
 cp .env.local.example .env.local   # Supabase URL/anon key 입력
-npm run dev
+pnpm dev
 ```
 
 http://localhost:3000 에서 확인.
