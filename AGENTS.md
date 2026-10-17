@@ -140,6 +140,11 @@ confirmation stays on, Kakao login deferred.
   the helpers in `src/features/booking/slots.ts`, never with `new Date(y,
 m, d)` arithmetic.
 - Photos use plain `<img>` on purpose (arbitrary hosts).
+- Every destructive action (delete, remove, leave, regenerate) asks first
+  through `useConfirm()` from `components/ui/ConfirmDialog`, with a
+  labelled confirming button (`삭제`, `참여 취소`, …) and `danger` when
+  something is lost. Never `window.confirm`: it is unstyled and some
+  embedded browsers dismiss it silently.
 - Do not ask the user to run SQL for routine setup. Venues, courts,
   roles and events are all managed in the app.
 

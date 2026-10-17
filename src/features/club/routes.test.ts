@@ -18,6 +18,7 @@ describe("routes", () => {
       at({ venueId: "v1", tab: "league", leagueId: "l1" }),
       at({ venueId: "v1", tab: "league", leagueId: "l1", leagueTab: "standings" }),
       at({ tab: "myschedule" }),
+      at({ tab: "myschedule", bookingId: "b1" }),
       at({ tab: "members" }),
       at({ account: true }),
     ];
@@ -32,6 +33,7 @@ describe("routes", () => {
       "/venues/v1/leagues/l1/schedule",
     );
     expect(buildPath(at({ tab: "members" }))).toBe("/members");
+    expect(buildPath(at({ tab: "myschedule", bookingId: "b1" }))).toBe("/schedule/b1");
     // The account sheet is its own page, whatever was open before.
     expect(buildPath(at({ venueId: "v1", tab: "members", account: true }))).toBe("/account");
   });

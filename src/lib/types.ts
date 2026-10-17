@@ -140,7 +140,9 @@ export interface League {
 /** One of the signed-in member's matches, across events. */
 export interface MyMatch {
   id: string;
+  leagueId: string;
   leagueName: string;
+  venueId: string;
   eventDate: string;
   venueName: string;
   roundNumber: number;

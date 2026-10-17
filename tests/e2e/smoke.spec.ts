@@ -46,20 +46,19 @@ test("the owner can book a free court slot and see it in their schedule", async 
 
   await page.getByRole("button", { name: "내 일정" }).click();
   await expect(page.getByText("Yongsan Mmove · 코트").first()).toBeVisible();
-
-  // As an admin, delete the booking again from the grid.
-  await page.getByRole("button", { name: "코트 예약" }).click();
-  await pickLastDay(page);
-  page.once("dialog", (dialog) => dialog.accept());
-  await page
-    .getByRole("button", { name: /5자리 남음/ })
-    .first()
-    .click();
-  // The open booking is in the URL, so the sheet survives a reload and the link can be shared.
-  await expect(page).toHaveURL(/\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}$/);
+  // A row opens the booking's sheet over 내 일정, with the booking in the URL,
+  // so the sheet survives a reload and the link can be shared.
+  await page.getByRole("button", { name: "예약 보기" }).first().click();
+  await expect(page).toHaveURL(/\/schedule\/[0-9a-f-]{36}$/);
   await page.reload();
   await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
+
+  // As an admin, delete the booking from the open sheet; the grid is free again.
+  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "예약 삭제" }).click();
+  await expect(page).toHaveURL(/\/schedule$/);
+  await page.getByRole("button", { name: "코트 예약" }).click();
+  await pickLastDay(page);
   await expect(freeSlots).toHaveCount(before);
 });
 

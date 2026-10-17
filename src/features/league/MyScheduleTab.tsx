@@ -1,14 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
+import { ChevronRight } from "lucide-react";
 import { EmptyHint } from "@/components/ui/EmptyHint";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { changesOpen, kindOf } from "@/features/booking/constants";
-import { zonedDate } from "@/features/booking/slots";
-import { getMyBookings, getMyMatches } from "@/lib/db";
+import { JoinModal } from "@/features/booking/JoinModal";
+import { zonedDate, zonedTime } from "@/features/booking/slots";
+import { getBooking, getMyBookings, getMyMatches, type BookingPatch, type Who } from "@/lib/db";
 import { queryKeys } from "@/lib/queryKeys";
-import type { Member } from "@/lib/types";
+import type { Member, MyBooking, MyMatch } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { formatEventDate, todayDate } from "./eventDate";
 
@@ -32,16 +34,86 @@ interface MyScheduleTabProps {
   member: Member | null;
   isAdmin: boolean;
   onLeave: (participantId: string) => void;
+  onJoin: (bookingId: string, who: Who) => void;
+  onUpdate: (bookingId: string, patch: BookingPatch) => void;
+  onDelete: (bookingId: string) => void;
+  /** The booking whose sheet is open over this page (from the URL). */
+  bookingId: string | null;
+  onOpenBooking: (booking: MyBooking) => void;
+  onCloseBooking: () => void;
+  /** Opens the league event's schedule. */
+  onOpenMatch: (match: MyMatch) => void;
   onOpenAuth: () => void;
 }
 
+/* The clickable part of a row: looks like text, opens the item. */
+const openStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flex: 1,
+  minWidth: 0,
+  background: "none",
+  border: "none",
+  padding: 0,
+  textAlign: "left",
+  font: "inherit",
+  color: "inherit",
+  cursor: "pointer",
+};
+
 /* The signed-in member's upcoming court bookings at any venue. */
-export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MyScheduleTabProps) {
+export function MyScheduleTab({
+  member,
+  isAdmin,
+  onLeave,
+  onJoin,
+  onUpdate,
+  onDelete,
+  bookingId,
+  onOpenBooking,
+  onCloseBooking,
+  onOpenMatch,
+  onOpenAuth,
+}: MyScheduleTabProps) {
   const { data: bookings } = useQuery({
     queryKey: queryKeys.myBookings.forMember(member?.id ?? ""),
     queryFn: () => getMyBookings(member!.id, new Date()),
     enabled: !!member,
   });
+
+  // The booking sheet named in the URL, shown over the page (also for visitors, via a shared link).
+  const detail = useQuery({
+    queryKey: queryKeys.booking.detail(bookingId ?? ""),
+    queryFn: () => getBooking(bookingId!),
+    enabled: !!bookingId,
+  });
+  const open = detail.data ?? null;
+  const sheet = open && (
+    <JoinModal
+      venue={open.venue}
+      slot={{
+        date: zonedDate(new Date(open.booking.startsAt), open.venue.timezone),
+        time: zonedTime(new Date(open.booking.startsAt), open.venue.timezone),
+        courtId: open.booking.courtId,
+      }}
+      booking={open.booking}
+      member={member}
+      isAdmin={isAdmin}
+      freeHours={1}
+      onCreate={() => {}}
+      onJoin={(who) => onJoin(open.booking.id, who)}
+      onLeave={onLeave}
+      onUpdate={(patch) => onUpdate(open.booking.id, patch)}
+      onDelete={() => {
+        onDelete(open.booking.id);
+        onCloseBooking();
+      }}
+      onOpenAuth={onOpenAuth}
+      onClose={onCloseBooking}
+    />
+  );
+  const missing = !!bookingId && !detail.isPending && !open;
   const { data: matches } = useQuery({
     queryKey: queryKeys.myMatches.forMember(member?.id ?? ""),
     queryFn: () => getMyMatches(member!.id, todayDate()),
@@ -56,12 +128,27 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
         <div style={{ marginTop: 12 }}>
           <PrimaryButton onClick={onOpenAuth}>회원가입 · 로그인</PrimaryButton>
         </div>
+        {sheet}
       </SectionCard>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {missing && (
+        <div
+          style={{
+            fontSize: 12,
+            color: C.danger,
+            background: "rgba(194,84,80,0.08)",
+            border: `1px solid ${C.danger}`,
+            borderRadius: 10,
+            padding: "8px 12px",
+          }}
+        >
+          링크의 예약을 찾을 수 없어요. 취소됐거나 지난 예약이에요.
+        </div>
+      )}
       <SectionCard>
         <Eyebrow>내 코트 예약</Eyebrow>
         {!bookings ? null : bookings.length === 0 ? (
@@ -70,15 +157,18 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
             {bookings.map((b) => (
               <div key={b.id} style={rowStyle}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    {zonedDate(new Date(b.startsAt), Intl.DateTimeFormat().resolvedOptions().timeZone)} ·{" "}
-                    {timeRange(b.startsAt, b.endsAt)}
+                <button onClick={() => onOpenBooking(b)} style={openStyle} aria-label="예약 보기">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {zonedDate(new Date(b.startsAt), Intl.DateTimeFormat().resolvedOptions().timeZone)} ·{" "}
+                      {timeRange(b.startsAt, b.endsAt)}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
+                      {b.venueName} · 코트 {b.courtName}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
-                    {b.venueName} · 코트 {b.courtName}
-                  </div>
-                </div>
+                  <ChevronRight size={16} color="rgba(27,36,34,0.4)" />
+                </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
                     style={{
@@ -124,14 +214,17 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
             {matches.map((m) => (
               <div key={m.id} style={rowStyle}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    {formatEventDate(m.eventDate)} · {m.leagueName}
+                <button onClick={() => onOpenMatch(m)} style={openStyle} aria-label="경기 보기">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {formatEventDate(m.eventDate)} · {m.leagueName}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
+                      {m.venueName} · {m.roundNumber}라운드 · 코트 {m.court} · vs {m.opponents.join(", ")}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "rgba(27,36,34,0.55)" }}>
-                    {m.venueName} · {m.roundNumber}라운드 · 코트 {m.court} · vs {m.opponents.join(", ")}
-                  </div>
-                </div>
+                  <ChevronRight size={16} color="rgba(27,36,34,0.4)" />
+                </button>
                 {m.scoreA !== "" && m.scoreB !== "" && (
                   <span style={{ fontFamily: FONT.mono, fontWeight: 700, fontSize: 15 }}>
                     {m.scoreA}:{m.scoreB}
@@ -142,6 +235,7 @@ export function MyScheduleTab({ member, isAdmin, onLeave, onOpenAuth }: MySchedu
           </div>
         )}
       </SectionCard>
+      {sheet}
     </div>
   );
 }

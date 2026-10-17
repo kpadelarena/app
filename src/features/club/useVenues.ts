@@ -57,6 +57,7 @@ export function useVenues(memberId: string | null, venueId: string | null) {
         for (const key of [
           queryKeys.venues,
           queryKeys.bookings.all,
+          queryKeys.booking.all,
           queryKeys.myBookings.all,
           queryKeys.leagues.all,
           queryKeys.league.all,
@@ -74,6 +75,7 @@ export function useVenues(memberId: string | null, venueId: string | null) {
     onError: () => setSaveError(true),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.booking.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.myBookings.all });
     },
   });
