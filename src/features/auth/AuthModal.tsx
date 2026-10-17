@@ -25,6 +25,8 @@ interface AuthModalProps {
   onLogIn: (email: string, password: string) => Promise<AuthOutcome>;
   /** Starts the Google redirect; resolves with an error only if it could not start. */
   onGoogle: () => Promise<AuthOutcome>;
+  /** Emails a password-reset link. */
+  onResetPassword: (email: string) => Promise<AuthOutcome>;
   onLogout: () => void;
   onSignUp: (form: SignUpForm) => Promise<AuthOutcome>;
   onUploadProfilePhoto: (file: File) => void | Promise<void>;
@@ -124,6 +126,7 @@ export function AuthModal({
   contact,
   onLogIn,
   onGoogle,
+  onResetPassword,
   onLogout,
   onSignUp,
   onUploadProfilePhoto,
@@ -132,7 +135,7 @@ export function AuthModal({
   profileUploading,
   onClose,
 }: AuthModalProps) {
-  const [mode, setMode] = useState<"profile" | "login" | "signup">(member ? "profile" : "login");
+  const [mode, setMode] = useState<"profile" | "login" | "signup" | "reset">(member ? "profile" : "login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -147,6 +150,23 @@ export function AuthModal({
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginNotice, setLoginNotice] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+
+  const submitReset = async () => {
+    setLoginError("");
+    if (!loginEmail.includes("@")) {
+      setLoginError("이메일 주소를 확인해 주세요.");
+      return;
+    }
+    setBusy(true);
+    const result = await onResetPassword(loginEmail);
+    setBusy(false);
+    if (result.error) {
+      setLoginError("메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    setResetSent(true);
+  };
 
   const submitSignUp = async () => {
     setSignupError("");
@@ -213,7 +233,17 @@ export function AuthModal({
 
   return (
     <BottomSheet
-      header={<Eyebrow>{mode === "profile" ? "내 프로필" : mode === "login" ? "로그인" : "회원가입"}</Eyebrow>}
+      header={
+        <Eyebrow>
+          {mode === "profile"
+            ? "내 프로필"
+            : mode === "login"
+              ? "로그인"
+              : mode === "reset"
+                ? "비밀번호 재설정"
+                : "회원가입"}
+        </Eyebrow>
+      }
       headerAlign="center"
       zIndex={60}
       onClose={onClose}
@@ -279,6 +309,51 @@ export function AuthModal({
             style={{ ...linkButtonStyle, marginTop: 8, color: C.turf, fontWeight: 700 }}
           >
             + 새 회원가입
+          </button>
+          <button
+            onClick={() => {
+              setLoginError("");
+              setResetSent(false);
+              setMode("reset");
+            }}
+            style={{ ...linkButtonStyle, color: "rgba(27,36,34,0.5)" }}
+          >
+            비밀번호를 잊으셨나요?
+          </button>
+        </div>
+      )}
+
+      {mode === "reset" && (
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          {resetSent ? (
+            <div style={{ fontSize: 13, color: C.turf }}>
+              {loginEmail.trim()} 로 재설정 링크를 보냈어요. 메일의 링크를 열어 새 비밀번호를 정해 주세요.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: "rgba(27,36,34,0.6)" }}>
+                가입한 이메일을 입력하면 비밀번호를 새로 정할 수 있는 링크를 보내드려요.
+              </div>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="이메일"
+                autoCapitalize="off"
+                onKeyDown={(e) => e.key === "Enter" && submitReset()}
+                style={fieldStyle}
+              />
+              {loginError && <div style={{ fontSize: 12, color: C.danger }}>{loginError}</div>}
+              <PrimaryButton onClick={submitReset} disabled={busy || !loginEmail.trim()}>
+                {busy ? "보내는 중..." : "재설정 메일 보내기"}
+              </PrimaryButton>
+            </>
+          )}
+          <button
+            onClick={() => setMode("login")}
+            style={{ ...linkButtonStyle, marginTop: 8, color: "rgba(27,36,34,0.5)" }}
+          >
+            로그인으로 돌아가기
           </button>
         </div>
       )}

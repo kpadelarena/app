@@ -122,3 +122,47 @@ test("the owner can change a member's role and change it back", async ({ page })
   await page.getByLabel("이서연 역할").selectOption("member");
   await expect(page.getByLabel("이서연 역할")).toHaveValue("member");
 });
+
+const MEMBER = { email: "member@example.com", password: "padel-dev", name: "이서연" };
+
+/* The local stack delivers auth mail to Mailpit; this returns the first link in the newest message to `email`. */
+async function latestMailLink(email: string) {
+  const list = await (
+    await fetch("http://127.0.0.1:54324/api/v1/search?query=" + encodeURIComponent(`to:${email}`))
+  ).json();
+  const id = list.messages?.[0]?.ID;
+  if (!id) throw new Error(`no mail for ${email}`);
+  const message = await (await fetch(`http://127.0.0.1:54324/api/v1/message/${id}`)).json();
+  const match = (message.Text as string).match(/https?:\/\/\S+/);
+  if (!match) throw new Error("no link in mail");
+  return match[0];
+}
+
+/* Requests a reset mail for the member, opens the link and sets `password`. */
+async function resetPasswordTo(page: Page, password: string, previousLink: string | null) {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.goto("/");
+  await page.getByRole("button", { name: "회원가입 · 로그인" }).click();
+  await page.getByRole("button", { name: "비밀번호를 잊으셨나요?" }).click();
+  await page.getByPlaceholder("이메일").fill(MEMBER.email);
+  await page.getByRole("button", { name: "재설정 메일 보내기" }).click();
+  await expect(page.getByText("재설정 링크를 보냈어요")).toBeVisible();
+
+  await expect.poll(() => latestMailLink(MEMBER.email).catch(() => null), { timeout: 10_000 }).not.toBe(previousLink);
+  const link = await latestMailLink(MEMBER.email);
+  await page.goto(link);
+  await expect(page).toHaveURL(/\/reset-password/);
+  await page.getByPlaceholder("새 비밀번호", { exact: false }).first().fill(password);
+  await page.getByPlaceholder("새 비밀번호 확인").fill(password);
+  await page.getByRole("button", { name: "비밀번호 바꾸기" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText(MEMBER.name).first()).toBeVisible();
+  return link;
+}
+
+test("a member can reset their password from the emailed link", async ({ page }) => {
+  // Supabase refuses a password equal to the current one, so change it and then restore the seeded one.
+  const first = await resetPasswordTo(page, `temp-${Date.now()}`, null);
+  await resetPasswordTo(page, MEMBER.password, first);
+});

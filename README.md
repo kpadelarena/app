@@ -110,14 +110,11 @@ Vercel 프로젝트(Production, Preview 모두)에 두 값을 넣습니다. 빌�
 ### 5. Auth URL 설정
 
 Supabase **Authentication → URL Configuration**: Site URL은 Vercel 운영 주소,
-Redirect URLs에 `https://*-kpadelarena.vercel.app/**`(프리뷰)와
+Redirect URLs에 `https://kpadelarena.vercel.app/**`(운영, 비밀번호 재설정
+페이지 등 하위 경로용), `https://*-kpadelarena.vercel.app/**`(프리뷰),
 `http://localhost:3000/**`(로컬)을 추가합니다.
 
 (anon key는 브라우저에 노출돼도 안전합니다 — 실제 접근 제어는 RLS 정책이
 담당합니다.)
 
 ## 알려진 제한사항
-
-- **비밀번호 찾기**: 이메일 기반 자동 복구가 없습니다. 관리자가 Supabase
-  Dashboard → Authentication → Users에서 해당 사용자의 비밀번호를 직접
-  새로 설정해 알려줘야 합니다.
