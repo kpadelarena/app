@@ -10,8 +10,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { updatePassword } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
 import { C } from "@/styles/tokens";
-
-const MIN_PASSWORD = 6;
+import { PASSWORD_HINT, newPasswordSchema, validate } from "./validation";
 
 /* Opened from the reset email. The link carries a recovery session that
    supabase-js picks up from the URL; the form then sets the new password. */
@@ -42,12 +41,9 @@ export function ResetPasswordScreen() {
 
   const submit = async () => {
     setError("");
-    if (password.length < MIN_PASSWORD) {
-      setError(`비밀번호는 ${MIN_PASSWORD}자 이상으로 입력해 주세요.`);
-      return;
-    }
-    if (password !== confirm) {
-      setError("비밀번호가 일치하지 않아요.");
+    const errors = validate(newPasswordSchema, { password, passwordConfirm: confirm });
+    if (Object.keys(errors).length > 0) {
+      setError(Object.values(errors)[0] ?? "");
       return;
     }
     setBusy(true);
@@ -82,7 +78,7 @@ export function ResetPasswordScreen() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={`새 비밀번호 (${MIN_PASSWORD}자 이상)`}
+                placeholder={`새 비밀번호 (${PASSWORD_HINT})`}
                 autoComplete="new-password"
                 style={fieldStyle}
               />

@@ -1,7 +1,7 @@
 -- Local development data. Applied by `supabase start` / `supabase db reset`
 -- to the local database only — never to a hosted project.
 --
--- Dev logins (password "padel-dev" for all):
+-- Dev logins (password "padel-dev1" for all):
 --   owner@example.com   owner
 --   admin@example.com   admin
 --   member@example.com  member
@@ -16,7 +16,7 @@ insert into auth.users (
 )
 select
   '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated',
-  email, extensions.crypt('padel-dev', extensions.gen_salt('bf')), now(),
+  email, extensions.crypt('padel-dev1', extensions.gen_salt('bf')), now(),
   '{"provider":"email","providers":["email"]}', jsonb_build_object('display_name', display_name), now(), now(),
   '', '', '', ''
 from (values

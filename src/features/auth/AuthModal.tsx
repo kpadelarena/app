@@ -8,6 +8,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import type { Contact, Member } from "@/lib/types";
 import { C, FONT } from "@/styles/tokens";
 import { LevelSlider } from "./LevelSlider";
+import { MIN_PASSWORD, PASSWORD_HINT, signUpSchema, validate } from "./validation";
 
 export interface SignUpForm {
   name: string;
@@ -35,8 +36,6 @@ interface AuthModalProps {
   profileUploading: boolean;
   onClose: () => void;
 }
-
-const MIN_PASSWORD = 6;
 
 function GoogleButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
   return (
@@ -185,19 +184,14 @@ export function AuthModal({
     setResetSent(true);
   };
 
+  // Checked on every keystroke; the button stays off until the form passes.
+  const signupErrors = validate(signUpSchema, { name, email, password, passwordConfirm });
+  const signUpValid = Object.keys(signupErrors).length === 0;
+
   const submitSignUp = async () => {
     setSignupError("");
-    if (!name.trim()) return;
-    if (!email.includes("@")) {
-      setSignupError("이메일 주소를 확인해 주세요.");
-      return;
-    }
-    if (password.length < MIN_PASSWORD) {
-      setSignupError(`비밀번호는 ${MIN_PASSWORD}자 이상으로 입력해 주세요.`);
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setSignupError("비밀번호가 일치하지 않아요.");
+    if (!signUpValid) {
+      setSignupError(Object.values(signupErrors)[0] ?? "");
       return;
     }
     setBusy(true);
@@ -426,16 +420,24 @@ export function AuthModal({
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={`비밀번호 (${MIN_PASSWORD}자 이상)`}
+            placeholder="비밀번호"
+            autoComplete="new-password"
             style={fieldStyle}
           />
+          <div style={{ fontSize: 11, color: password && signupErrors.password ? C.danger : "rgba(27,36,34,0.5)" }}>
+            {(password && signupErrors.password) || PASSWORD_HINT}
+          </div>
           <input
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
             placeholder="비밀번호 확인"
+            autoComplete="new-password"
             style={fieldStyle}
           />
+          {passwordConfirm && signupErrors.passwordConfirm && (
+            <div style={{ fontSize: 11, color: C.danger }}>{signupErrors.passwordConfirm}</div>
+          )}
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -446,11 +448,7 @@ export function AuthModal({
 
           {signupError && <div style={{ fontSize: 12, color: C.danger }}>{signupError}</div>}
 
-          <PrimaryButton
-            onClick={submitSignUp}
-            icon={UserPlus}
-            disabled={busy || !name.trim() || !email.trim() || password.length < MIN_PASSWORD}
-          >
+          <PrimaryButton onClick={submitSignUp} icon={UserPlus} disabled={busy || !signUpValid}>
             {busy ? "가입 중..." : "가입하기"}
           </PrimaryButton>
           <div style={{ fontSize: 11, color: "rgba(27,36,34,0.5)" }}>
